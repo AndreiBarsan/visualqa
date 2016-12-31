@@ -4,6 +4,7 @@ import logging
 
 log = logging.getLogger('bow_vgg_baseline')
 
+
 class BoWVGGBaseline(object):
 
     def __init__(self, **kw):

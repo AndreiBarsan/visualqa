@@ -49,20 +49,6 @@ def aws(sub='run', label='aws-tesla'):
 #     flocal('python learn.py')
 
 
-def _run_commodity(run_label: str) -> None:
-    """Runs the TF pipeline on commodity hardware with no job queueing."""
-    work_dir = "/home/ubuntu/vqa/experiments"
-    print("Using work dir {0}.".format(work_dir))
-    _sync_code()
-
-    with cd(work_dir):
-        ts = '$(date +%Y%m%dT%H%M%S)'
-        # Sourcing the bashrc to ensure LD_LIBRARY_PATH is sane.
-        tf_command = ('t=' + ts + ' && mkdir $t && cd $t && python ' + _run_experiment(run_label))
-        _in_screen(_as_conda(tf_command), 'vqa_experiment_screen',
-                   shell_escape=False, shell=False)
-
-
 def _preprocess_commodity() -> None:
     _sync_code()
     work_dir = "/home/ubuntu/vqa/visualqa"
@@ -73,13 +59,35 @@ def _preprocess_commodity() -> None:
         run(_as_conda('./preprocess.py -dataroot /data/vqa'))
 
 
+def _run_commodity(run_label: str) -> None:
+    """Runs the TF pipeline on commodity hardware with no job queueing."""
+    work_dir = "/home/ubuntu/vqa/experiments"
+    print("Using work dir {0}.".format(work_dir))
+    _sync_code()
+
+    with cd(work_dir):
+        ts = '$(date +%Y%m%dT%H%M%S)'
+        tf_command = ('t=' + ts + ' && mkdir $t && cd $t && python ' + _run_experiment(run_label))
+
+        # TODO(andrei): Flag to disable screen.
+        run(_as_conda(tf_command), shell=False, shell_escape=False)
+        # _in_screen(_as_conda(tf_command), 'vqa_experiment_screen',
+        #            shell_escape=False, shell=False)
+
+
+def _eval_commodity(experiment_id: str) -> None:
+    """Evaluates the accuracy of the model trained by the given experiment."""
+    raise Exception("Not yet implemented.")
+
+
 def _run_experiment(run_label: str) -> str:
     """This is the command for training the model.
 
     It is called inside a screen right away when running on AWS, and submitted
     to LFS using 'bsub' on Euler.
     """
-    return "../../visualqa/main.py"
+    # return "../../visualqa/main.py"
+    return '../../visualqa/trainMLP.py'
 
 
 def _sync_code(remote_code_dir='/home/ubuntu/vqa/visualqa') -> None:
@@ -97,13 +105,21 @@ def _sync_code(remote_code_dir='/home/ubuntu/vqa/visualqa') -> None:
 def _as_conda(cmd: str, env_name='ml') -> str:
     """Ensures the command gets run in the specified anaconda env."""
 
-    return "source /home/ubuntu/.bashrc && source /home/ubuntu/bin/anaconda3/bin/activate {0} && {1}".format(
-        env_name, cmd)
+    # Sourcing the bashrc to ensure LD_LIBRARY_PATH is sane.
+    return "source /home/ubuntu/.bashrc && " \
+           "source /home/ubuntu/bin/anaconda3/bin/activate {0} && " \
+           "{1}".format(env_name, cmd)
 
 
 def _in_screen(cmd: str, screen_name: str, **kw) -> None:
     """Runs the specified command inside a persistent screen.
+
+    This allows the command to properly return after kicking off a job.
     The screen persists into a regular 'bash' after the command completes.
+
+    Notes
+        One can use `screen -ls` and `screen -r <id>` to list active screens,
+        and to reattach to a specific screen on the host running the jobs.
     """
     screen = "screen -dmS {0} bash -c '{1} ; exec bash'".format(screen_name, cmd)
     print("Screen to run: [{0}]".format(screen))
