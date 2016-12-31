@@ -105,7 +105,7 @@ def _in_screen(cmd: str, screen_name: str, **kw) -> None:
     """Runs the specified command inside a persistent screen.
     The screen persists into a regular 'bash' after the command completes.
     """
-    screen = "screen -dmS {} bash -c '{} ; exec bash'".format(screen_name, cmd)
+    screen = "screen -dmS {0} bash -c '{1} ; exec bash'".format(screen_name, cmd)
     print("Screen to run: [{0}]".format(screen))
     run(screen, pty=False, **kw)
 
