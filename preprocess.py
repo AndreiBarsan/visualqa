@@ -52,13 +52,13 @@ def main():
                         help='Specify which part of the dataset you want to dump to text. Your options are: train, val, test, test-dev')
     parser.add_argument('-answers', type=str, default='modal',
                         help='Specify if you want to dump just the most frequent answer for each questions (modal), or all the answers (all)')
+    parser.add_argument('-dataroot', type=str, default='/data/vqa',
+                        help='Root folder containing data subfolders such as "Annotations" and "Questions".')
     args = parser.parse_args()
 
-    nlp = English()  # used for conting number of tokens
-
-    # TODO(andrei): Pass as argument after converting to click. And do not
-    # hardcode local paths at all.
-    root = pjoin('/Volumes', 'palos', 'Datasets', 'vqa')
+    # used for counting number of tokens
+    nlp = English()
+    root = args.dataroot
 
     fname_map = {
         'train': {

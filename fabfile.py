@@ -38,6 +38,8 @@ env.use_ssh_config = True
 def aws(sub='run', label='aws-tesla'):
     if sub == 'run':
         _run_commodity(label)
+    elif sub == 'preprocess':
+        _preprocess_commodity()
     else:
         raise ValueError("Not yet supported.")
 
@@ -51,16 +53,24 @@ def _run_commodity(run_label: str) -> None:
     """Runs the TF pipeline on commodity hardware with no job queueing."""
     work_dir = "/home/ubuntu/vqa/experiments"
     print("Using work dir {0}.".format(work_dir))
-    _sync_code(work_dir)
+    _sync_code()
 
     with cd(work_dir):
         ts = '$(date +%Y%m%dT%H%M%S)'
         # Sourcing the bashrc to ensure LD_LIBRARY_PATH is sane.
-        # TODO(andrei): Clean the debug echos.
-        tf_command = ('source /home/ubuntu/.bashrc && source /home/ubuntu/bin/anaconda3/bin/activate ml && t=' + ts + ' && mkdir $t && cd $t &&'
-                                  'python ' + _run_experiment(run_label))
-        _in_screen(tf_command, 'vqa_experiment_screen', shell_escape=False,
-                   shell=False)
+        tf_command = ('t=' + ts + ' && mkdir $t && cd $t && python ' + _run_experiment(run_label))
+        _in_screen(_as_conda(tf_command), 'vqa_experiment_screen',
+                   shell_escape=False, shell=False)
+
+
+def _preprocess_commodity() -> None:
+    _sync_code()
+    work_dir = "/home/ubuntu/vqa/visualqa"
+    with cd(work_dir):
+        # Ensure we have the assets for tokenizing stuff.
+        run(_as_conda('python -m spacy.en.download'))
+        # Extract the useful parts of the JSON inputs as text files.
+        run(_as_conda('./preprocess.py -dataroot /data/vqa'))
 
 
 def _run_experiment(run_label: str) -> str:
@@ -72,19 +82,23 @@ def _run_experiment(run_label: str) -> str:
     return "../../visualqa/main.py"
 
 
-def _sync_code(work_dir: str) -> None:
+def _sync_code(remote_code_dir='/home/ubuntu/vqa/visualqa') -> None:
     """Copies the code to the remote host. Does NOT copy data.
 
     This is simply because the VQA dataset on which we are operating is over
     30 GiB, and it would be infeasible to try to sync it every time.
     """
-
-    run('mkdir -p {0}'.format(work_dir))
-    run('mkdir -p {0}/../visualqa/'.format(work_dir))
-
-    rsync(remote_dir=os.path.join(work_dir, '../visualqa/'),
+    run('mkdir -p {0}'.format(remote_code_dir))
+    rsync(remote_dir=remote_code_dir,
           local_dir='.',
           exclude=['.git', '.idea', '*__pycache__*'])
+
+
+def _as_conda(cmd: str, env_name='ml') -> str:
+    """Ensures the command gets run in the specified anaconda env."""
+
+    return "source /home/ubuntu/.bashrc && source /home/ubuntu/bin/anaconda3/bin/activate {0} && {1}".format(
+        env_name, cmd)
 
 
 def _in_screen(cmd: str, screen_name: str, **kw) -> None:
