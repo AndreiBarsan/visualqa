@@ -7,6 +7,8 @@ import os
 import operator
 from itertools import zip_longest
 from collections import defaultdict
+from typing import List
+
 
 def selectFrequentAnswers(questions_train, answers_train, images_train, maxAnswers):
     answer_fq= defaultdict(int)
@@ -41,4 +43,12 @@ def mkdirp(path):
     except FileExistsError:
         # The folder already exists. We're good.
         pass
+
+
+def lines(fpath: str) -> List[str]:
+    with open(fpath, 'r') as file:
+        return file.read().splitlines()
+
+
+
 

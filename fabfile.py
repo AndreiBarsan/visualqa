@@ -54,9 +54,11 @@ def _preprocess_commodity() -> None:
     work_dir = "/home/ubuntu/vqa/visualqa"
     with cd(work_dir):
         # Ensure we have the assets for tokenizing stuff.
-        run(_as_conda('python -m spacy.en.download'))
+        run(_as_conda('python -m spacy.en.download || echo Spacy OK'))
         # Extract the useful parts of the JSON inputs as text files.
-        run(_as_conda('./preprocess.py -dataroot /data/vqa'))
+        # TODO(andrei): Parameterize this properly.
+        split = 'val'
+        run(_as_conda('./preprocess.py -dataroot /data/vqa -split {0}'.format(split)))
 
 
 def _run_commodity(run_label: str) -> None:
@@ -87,7 +89,7 @@ def _run_experiment(run_label: str) -> str:
     to LFS using 'bsub' on Euler.
     """
     # return "../../visualqa/main.py"
-    return '../../visualqa/trainMLP.py'
+    return '../../visualqa/trainMLP.py -dataroot /data/vqa -batch_size 2048'
 
 
 def _sync_code(remote_code_dir='/home/ubuntu/vqa/visualqa') -> None:

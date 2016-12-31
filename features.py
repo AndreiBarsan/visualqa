@@ -87,7 +87,7 @@ def get_images_matrix(img_coco_ids, img_map, VGGfeatures):
     Ouput:
     A numpy matrix of size (nb_samples, nb_dimensions)
     '''
-    # assert not isinstance(img_coco_ids, basestring)
+    assert not isinstance(img_coco_ids, str)
     nb_samples = len(img_coco_ids)
     nb_dimensions = VGGfeatures.shape[0]
     image_matrix = np.zeros((nb_samples, nb_dimensions))
