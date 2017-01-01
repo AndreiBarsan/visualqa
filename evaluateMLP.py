@@ -67,10 +67,6 @@ def main():
     nb_classes = 1000
     y_predict_text = []
     batchSize = 128
-    # widgets = ['Evaluating ', Percentage(), ' ',
-    #            Bar(marker='#', left='[', right=']'),
-    #            ' ', ETA()]
-    # pbar = ProgressBar(widgets=widgets)
 
     stuff = list(zip(
         grouper(questions_val, batchSize, fillvalue=questions_val[0]),
