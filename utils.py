@@ -10,7 +10,7 @@ from collections import defaultdict
 from typing import List, Dict
 
 
-def selectFrequentAnswers(questions_train, answers_train, images_train, maxAnswers):
+def select_frequent_answers(questions_train, answers_train, images_train, maxAnswers):
     answer_fq= defaultdict(int)
     #build a dictionary of answers
     for answer in answers_train:

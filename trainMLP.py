@@ -30,7 +30,7 @@ from sklearn import preprocessing
 
 from features import get_images_matrix, get_answers_matrix
 from features import get_questions_matrix_sum
-from utils import selectFrequentAnswers, mkdirp, grouper, lines
+from utils import select_frequent_answers, mkdirp, grouper, lines
 
 
 def main():
@@ -44,13 +44,21 @@ def main():
     parser.add_argument('-model_save_interval', type=int, default=10)
     parser.add_argument('-batch_size', type=int, default=128)
     parser.add_argument('-dataroot', type=str, default='/data/vqa')
+    parser.add_argument('-experiment_root', type=str, default='.',
+                        help="Folder where things such as checkpoints are "
+                             "saved. By default, this is the program's "
+                             "working directory, since the Fabric deployment "
+                             "script creates a custom work directory for "
+                             "training every time.")
     args = parser.parse_args()
 
-    root = args.dataroot
-    q_train_fpath = pjoin(root, 'Preprocessed', 'questions_train2014.txt')
-    a_train_fpath = pjoin(root, 'Preprocessed', 'answers_train2014_modal.txt')
-    i_train_fpath = pjoin(root, 'Preprocessed', 'images_train2014.txt')
-    pretrained_vgg_model_fpath = pjoin(root, 'coco', 'vgg_feats.mat')
+    data_root = args.dataroot
+    experiment_root = args.experiment_root
+
+    q_train_fpath = pjoin(data_root, 'Preprocessed', 'questions_train2014.txt')
+    a_train_fpath = pjoin(data_root, 'Preprocessed', 'answers_train2014_modal.txt')
+    i_train_fpath = pjoin(data_root, 'Preprocessed', 'images_train2014.txt')
+    pretrained_vgg_model_fpath = pjoin(data_root, 'coco', 'vgg_feats.mat')
 
     print("Will load Q&A data...")
     questions_train = lines(q_train_fpath)
@@ -63,24 +71,27 @@ def main():
     # problem in this baseline, we want to limit the number of possible
     # answers, and have the model simply pick the most appropriate one.
     max_answers = 1000
-    questions_train, answers_train, images_train = selectFrequentAnswers(
+    questions_train, answers_train, images_train = select_frequent_answers(
         questions_train, answers_train, images_train, max_answers)
-
-    # encode the remaining answers
-    labelencoder = preprocessing.LabelEncoder()
-    labelencoder.fit(answers_train)
-    nb_classes = len(list(labelencoder.classes_))
-
-    # TODO(andrei): Why are we dumping this?
-    mkdirp(pjoin(root, 'models'))
-    with open(pjoin(root, 'models', 'labelencoder.pkl'), 'wb') as pfile:
-        pickle.dump(labelencoder, pfile)
 
     print("Loading VGG features...")
     features_struct = scipy.io.loadmat(pretrained_vgg_model_fpath)
     VGGfeatures = features_struct['feats']
-    image_ids = lines(pjoin(root, 'coco_vgg_IDMap.txt'))
+    image_ids = lines(pjoin(data_root, 'coco_vgg_IDMap.txt'))
     print('Loaded vgg features.')
+
+    # encode the remaining answers
+    # TODO(andrei): Any good reason why we're saving this?
+    labelencoder = preprocessing.LabelEncoder()
+    labelencoder.fit(answers_train)
+    nb_classes = len(list(labelencoder.classes_))
+    mkdirp(pjoin(experiment_root, 'models'))
+    with open(pjoin(experiment_root, 'models', 'labelencoder.pkl'), 'wb') as pfile:
+        pickle.dump(labelencoder, pfile)
+
+    # Dump the arguments so we know which parameters we used for training.
+    with open(pjoin(experiment_root, 'args.pkl'), 'wb') as pfile:
+        pickle.dump(args, pfile)
 
     id_map = {}
     for ids in image_ids:
@@ -89,7 +100,7 @@ def main():
 
     print("Loading word2vec data...")
     nlp = English()
-    print('loaded word2vec features...')
+    print('Loaded word2vec features.')
 
     # This is the size of the last fully-connected VGG layer, before the
     # softmax.
@@ -121,23 +132,25 @@ def main():
     model.add(Dense(nb_classes, init='uniform'))
     model.add(Activation('softmax'))
 
-    # Dumps the model info to a file.
-    # TODO(andrei): Any particular reason for this dump? Just to ease
-    # evaluation later on?
+    # Dump the model structure so we can use it later (we dump just the raw
+    # weights with every checkpoint).
     json_string = model.to_json()
-    mkdirp(pjoin(root, 'models'))
+    mkdirp(pjoin(experiment_root, 'models'))
 
-    # TODO(andrei): Instead of root, save to current experiment folder instead.
-    if args.language_only:
-        model_name = 'mlp_language_only_num_hidden_units_{0}' \
-                     '_num_hidden_layers_{1}'.format(args.num_hidden_units,
-                                                     args.num_hidden_layers)
-        model_file_name = pjoin(root, 'models', model_name)
-    else:
-        model_name = 'mlp_num_hidden_units_{0}' \
-                     '_num_hidden_layers_{1}'.format(args.num_hidden_units,
-                                                     args.num_hidden_layers)
-        model_file_name = pjoin(root, 'models', model_name)
+    # TODO(andrei): The args pickle should contain enough data. Remove this
+    # code.
+    # if args.language_only:
+    #     model_name = 'mlp_language_only_num_hidden_units_{0}' \
+    #                  '_num_hidden_layers_{1}'.format(args.num_hidden_units,
+    #                                                  args.num_hidden_layers)
+    #     model_file_name = pjoin(experiment_root, 'models', model_name)
+    # else:
+    #     model_name = 'mlp_num_hidden_units_{0}' \
+    #                  '_num_hidden_layers_{1}'.format(args.num_hidden_units,
+    #                                                  args.num_hidden_layers)
+    #     model_file_name = pjoin(experiment_root, 'models', model_name)
+
+    model_file_name = pjoin(experiment_root, 'models', 'model')
     open(model_file_name + '.json', 'w').write(json_string)
 
     print('Compiling Keras model...')
@@ -145,7 +158,7 @@ def main():
     print('Compilation done...')
 
     print('Training started...')
-    for k in range(args.num_epochs):
+    for epoch in range(args.num_epochs):
         epoch_start_ms = int(time.time() * 1000)
         # shuffle the data points before going through them
         index_shuf = list(range(len(questions_train)))
@@ -175,13 +188,14 @@ def main():
         epoch_delta_s = (epoch_end_ms - epoch_start_ms) / 1000.0
         print("Epoch took {0:.1f}s.".format(epoch_delta_s))
 
-        # print type(loss)
-        if k % args.model_save_interval == 0:
-            model_dump_fname = model_file_name + '_epoch_{:02d}.hdf5'.format(k)
+        # Dump a checkpoint periodically.
+        if epoch % args.model_save_interval == 0:
+            model_dump_fname = model_file_name + '_epoch_{:02d}.hdf5'.format(epoch)
             print('Saving model to file: {0}'.format(model_dump_fname))
             model.save_weights(model_dump_fname)
 
-    model.save_weights(model_file_name + '_epoch_{:02d}.hdf5'.format(k))
+    # Final checkpoint dump.
+    model.save_weights(model_file_name + '_epoch_{:02d}.hdf5'.format(epoch))
 
 
 if __name__ == "__main__":
