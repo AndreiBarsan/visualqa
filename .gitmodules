@@ -1,0 +1,3 @@
+[submodule "VQA"]
+	path = VQA
+	url = https://github.com/AndreiBarsan/VQA
