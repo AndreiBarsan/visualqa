@@ -1,16 +1,5 @@
 """Fabric deployment file for remote model training.
 
-TODO(andrei): fabric is kind of deprecated. Use 'pyinvoke'.
-
-Uses a Python 3 fork of Fabric (http://www.fabfile.org/).
-Please install 'Fabric3' to use this, NOT the vanilla 'fabric'.
-
-```bash
-    pip install Fabric3
-```
-
-Note that even on Anaconda, you still have to use 'pip' to install 'Fabric3'.
-
 Make sure that 'env.hosts' points to wherever you want to train your model, and
 that the remote host has tensorflow installed.
 
@@ -21,8 +10,19 @@ that the remote host has tensorflow installed.
 # Andrei's prebuilt image, with AMI ID [ami-034aee63].
 
 Examples:
-    `fab preprocess` To perform preprocessing on the remote instance.
-    `fab train` To run the tool on an already configured AWS instance.
+    `fab -l`            Lists all available commands.
+    `fab preprocess`    To perform preprocessing on the remote instance.
+    `fab train`         To run the tool on an already configured AWS instance.
+
+Notes:
+    Uses a Python 3 fork of Fabric (http://www.fabfile.org/).
+    Please install 'Fabric3' to use this, NOT the vanilla 'fabric'.
+
+```bash
+    pip install Fabric3
+```
+
+Note that even on Anaconda, you still have to use 'pip' to install 'Fabric3'.
 """
 
 from os.path import join as pjoin
@@ -30,8 +30,8 @@ from os.path import join as pjoin
 from fabric.api import *
 from fabric.contrib.project import rsync_project as rsync
 
+PYTHON2_ENV_NAME = 'dl-2.7'
 env.use_ssh_config = True
-
 
 
 @hosts('aws-gpu')
@@ -72,6 +72,21 @@ def train(run_label: str='aws-exp', in_screen: str='True') -> None:
 
 
 @hosts('aws-gpu')
+def setup_conda() -> None:
+    # Creates a Python 2.7 environment required for the official VQA
+    # evaluation suite.
+    run('conda create -y --quiet --name dl-2.7 python=2.7 || echo Environment '
+        '\'dl-2.7\' probably already exists.')
+    run('source activate dl-2.7 && '
+        'conda install -y --quiet scikit-learn scikit-image matplotlib')
+
+    # TODO-LOW(andrei): Coder for setting up the main environment as well.
+    # Note: this env is already included in Andrei's AWS AMI (if you're using
+    # that, and are not on Azure) under the name 'ml'.
+    # run('conda create -y --name ml python=3.5')
+
+
+@hosts('aws-gpu')
 def eval(experiment_id: str) -> None:
     """Evaluates the accuracy of the model trained by the given experiment."""
     _sync_code()
@@ -80,17 +95,26 @@ def eval(experiment_id: str) -> None:
     root = pjoin('/data', 'vqa', 'models')
     # TODO(andrei): Always put these in the folder with experiment ID.
     model_fname = 'mlp_num_hidden_units_1024_num_hidden_layers_3.json'
-    weight_fname = 'mlp_num_hidden_units_1024_num_hidden_layers_3_epoch_25.hdf5'
+    weight_fname = 'mlp_num_hidden_units_1024_num_hidden_layers_3_epoch_120' \
+                   '.hdf5'
     results_fpath = pjoin('/tmp/', 'results-changeme.txt')
+    # TODO(andrei): What are we actually evaluating on? Ideally, we want
+    # stats for both train and validation!
+    results_json_fpath = pjoin('/tmp/', 'Results',
+                               'OpenEnded_mscoco_val2014_baseline_results.json')
 
     model_fpath = pjoin(root, model_fname)
     weight_fpath = pjoin(root, weight_fname)
 
     with cd('/home/ubuntu/vqa/visualqa'):
-        run(_as_conda(
-            'python evaluateMLP.py -model {0} -weights {1} -results {2} '
-            '-dataroot /data/vqa'.format(model_fpath, weight_fpath,
-                                         results_fpath)))
+        # run(_as_conda(
+        #     'python evaluateMLP.py -model {0} -weights {1} -results {2} '
+        #     '-results_json {3} -dataroot /data/vqa'.format(
+        #         model_fpath, weight_fpath, results_fpath, results_json_fpath)))
+
+        with cd('VQA'):
+            VQA_eval_command = 'python PythonEvaluationTools/vqaEvalDemo.py'
+            run(_as_conda(VQA_eval_command, PYTHON2_ENV_NAME))
 
 
 def _run_experiment(run_label: str) -> str:

@@ -34,6 +34,10 @@ def main():
                         help="Saved weights (checkpoint).")
     parser.add_argument('-results', type=str, required=True,
                         help="File where to write the results.")
+    parser.add_argument('-results_json', type=str, required=True,
+                        help="File where to dump the evaluation results in "
+                             "JSON format, so that the official VQA toolkit "
+                             "can read it.")
     parser.add_argument('-dataroot', type=str, default='/data/vqa')
     args = parser.parse_args()
     root = args.dataroot
@@ -43,6 +47,7 @@ def main():
     model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
 
     questions_val = lines(pjoin(root, 'Preprocessed', 'questions_val2014.txt'))
+    questions_id = lines(pjoin(root, 'Preprocessed', 'questions_id_val2014.txt'))
     answers_val = lines(pjoin(root, 'Preprocessed', 'answers_val2014_all.txt'))
     images_val = lines(pjoin(root, 'Preprocessed', 'images_val2014_all.txt'))
     vgg_model_path = pjoin(root, 'coco', 'vgg_feats.mat')
@@ -87,9 +92,15 @@ def main():
     correct_val = 0.0
     total = 0
     f1 = open(args.results, 'w')
+    print("Will dump resulting answers in JSON format to file: [{0}]".format(
+        args.results_json
+    ))
+    result_file_json = open(args.results_json, 'w')
+    result_file_json.write("[")
 
-    for prediction, truth, question, image in zip(y_predict_text, answers_val,
-                                                  questions_val, images_val):
+    all_preds = list(zip(y_predict_text, answers_val, questions_val,
+                        questions_id, images_val))
+    for idx, (prediction, truth, question, question_id, image) in enumerate(all_preds):
         temp_count = 0
         for _truth in truth.split(';'):
             if prediction == _truth:
@@ -111,6 +122,12 @@ def main():
         f1.write('\n')
         f1.write('\n')
 
+        # Note: Double-braces are escaped braces in Python format strings.
+        result_file_json.write(
+            '{{"answer": "{0}", "question_id": {1}}}{2}\n'.format(
+                prediction, question_id, ',' if idx < len(all_preds) - 1 else ''))
+
+    result_file_json.write("]\n")
     f1.write('Final Accuracy is ' + str(correct_val / total))
     f1.close()
 
