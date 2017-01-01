@@ -7,7 +7,7 @@ import os
 import operator
 from itertools import zip_longest
 from collections import defaultdict
-from typing import List
+from typing import List, Dict
 
 
 def selectFrequentAnswers(questions_train, answers_train, images_train, maxAnswers):
@@ -48,6 +48,12 @@ def mkdirp(path):
 def lines(fpath: str) -> List[str]:
     with open(fpath, 'r') as file:
         return file.read().splitlines()
+
+
+def kw_to_flags(kw_map: Dict) -> str:
+    """Conversts a list of keyword arguments to a string."""
+
+    return ""
 
 
 

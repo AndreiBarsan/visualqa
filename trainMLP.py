@@ -126,6 +126,8 @@ def main():
     # evaluation later on?
     json_string = model.to_json()
     mkdirp(pjoin(root, 'models'))
+
+    # TODO(andrei): Instead of root, save to current experiment folder instead.
     if args.language_only:
         model_name = 'mlp_language_only_num_hidden_units_{0}' \
                      '_num_hidden_layers_{1}'.format(args.num_hidden_units,
