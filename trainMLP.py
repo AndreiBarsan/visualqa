@@ -50,6 +50,9 @@ def main():
                              "working directory, since the Fabric deployment "
                              "script creates a custom work directory for "
                              "training every time.")
+    parser.add_argument('-model_eval_full_valid_interval', type=str,
+                        default=20, help="After how many epochs to run a full "
+                                         "validation-set evaluation.")
     args = parser.parse_args()
 
     data_root = args.dataroot
@@ -193,6 +196,12 @@ def main():
             model_dump_fname = model_file_name + '_epoch_{:02d}.hdf5'.format(epoch)
             print('Saving model to file: {0}'.format(model_dump_fname))
             model.save_weights(model_dump_fname)
+
+        # Compute overall accuracy periodically (but not too often, as it can
+        # get quite slow).
+        if (epoch + 1) % args.model_eval_full_valid_interval == 0:
+            # TODO(andrei): Implement this in a neat way.
+            pass
 
     # Final checkpoint dump.
     model.save_weights(model_file_name + '_epoch_{:02d}.hdf5'.format(epoch))
