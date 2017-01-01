@@ -44,7 +44,7 @@ def main():
 
     questions_val = lines(pjoin(root, 'Preprocessed', 'questions_val2014.txt'))
     answers_val = lines(pjoin(root, 'Preprocessed', 'answers_val2014_all.txt'))
-    images_val = lines(pjoin(root, 'Preprocessed', 'images_val2014.txt'))
+    images_val = lines(pjoin(root, 'Preprocessed', 'images_val2014_all.txt'))
     vgg_model_path = pjoin(root, 'coco', 'vgg_feats.mat')
 
     print('Model compiled, weights loaded...')
@@ -72,9 +72,10 @@ def main():
     #            ' ', ETA()]
     # pbar = ProgressBar(widgets=widgets)
 
-    stuff = zip(grouper(questions_val, batchSize, fillvalue=questions_val[0]),
-                grouper(answers_val, batchSize, fillvalue=answers_val[0]),
-                grouper(images_val, batchSize, fillvalue=images_val[0]))
+    stuff = list(zip(
+        grouper(questions_val, batchSize, fillvalue=questions_val[0]),
+        grouper(answers_val, batchSize, fillvalue=answers_val[0]),
+        grouper(images_val, batchSize, fillvalue=images_val[0])))
 
     with click.progressbar(stuff) as pbar:
         for (qu_batch, an_batch, im_batch) in pbar:
@@ -104,20 +105,20 @@ def main():
             correct_val += float(temp_count) / 3
 
         total += 1
-        f1.write(question.encode('utf-8'))
+        f1.write(question)
         f1.write('\n')
-        f1.write(image.encode('utf-8'))
+        f1.write(image)
         f1.write('\n')
         f1.write(prediction)
         f1.write('\n')
-        f1.write(truth.encode('utf-8'))
+        f1.write(truth)
         f1.write('\n')
         f1.write('\n')
 
     f1.write('Final Accuracy is ' + str(correct_val / total))
     f1.close()
 
-    # TODO(andrei): Readd this, so we are neat about keeping track of all our
+    # TODO(andrei): Re-add this, so we are neat about keeping track of all our
     # results.
     # f1 = open('../results/overall_results.txt', 'a')
     # f1.write(args.weights + '\n')

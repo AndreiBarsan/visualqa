@@ -14,14 +14,18 @@ Note that even on Anaconda, you still have to use 'pip' to install 'Fabric3'.
 Make sure that 'env.hosts' points to wherever you want to train your model, and
 that the remote host has tensorflow installed.
 
+# Hint: set your appropriate user and host for Euler in your '~/.ssh/config'!
+# Hint: To pass multiple arguments, to a fabric command, use:
+#  $ fab euler:run,some-label,foo,bar
+# Hint: configure this host to point to a GPU-enabled machine on AWS running
+# Andrei's prebuilt image, with AMI ID [ami-034aee63].
+
 Examples:
-    `fab aws:run` To run the tool on an AWS instance you already configured.
+    `fab preprocess` To perform preprocessing on the remote instance.
+    `fab train` To run the tool on an already configured AWS instance.
 """
 
-
-from __future__ import with_statement
-
-import os
+from os.path import join as pjoin
 
 from fabric.api import *
 from fabric.contrib.project import rsync_project as rsync
@@ -29,34 +33,9 @@ from fabric.contrib.project import rsync_project as rsync
 env.use_ssh_config = True
 
 
-# Hint: set your appropriate user and host for Euler in your '~/.ssh/config'!
-# Hint: To pass multiple arguments, to a fabric command, use:
-#  $ fab euler:run,some-label,foo,bar
-# Hint: configure this host to point to a GPU-enabled machine on AWS running
-# Andrei's prebuilt image, with AMI ID [ami-034aee63].
+
 @hosts('aws-gpu')
-def aws(sub='run', label='aws-tesla', in_screen='True', *args, **kw):
-    in_screen = in_screen.lower() in ['1', 'true']
-    print("Running AWS task with label [{0}], {1}in a screen.".format(
-        label, "" if in_screen else "NOT "
-    ))
-    if sub == 'run':
-        _run_commodity(label, in_screen)
-    elif sub == 'preprocess':
-        _preprocess_commodity()
-    elif sub in ['eval', 'evaluate']:
-        # _eval_commodity()
-        pass
-    else:
-        raise ValueError("Not yet supported.")
-
-
-# TODO(andrei): Do this properly, e.g. supporting subcommands, if necessary.
-# def local(sub='run', label='local'):
-#     flocal('python learn.py')
-
-
-def _preprocess_commodity() -> None:
+def preprocess() -> None:
     _sync_code()
     work_dir = "/home/ubuntu/vqa/visualqa"
     with cd(work_dir):
@@ -65,11 +44,18 @@ def _preprocess_commodity() -> None:
         # Extract the useful parts of the JSON inputs as text files.
         # TODO(andrei): Parameterize this properly.
         split = 'val'
-        run(_as_conda('./preprocess.py -dataroot /data/vqa -split {0}'.format(split)))
+        answers = 'all'
+        run(_as_conda('./preprocess.py -dataroot /data/vqa -split {0} '
+                      '-answers {1}'.format(split, answers)))
 
 
-def _run_commodity(run_label: str, in_screen: bool) -> None:
+@hosts('aws-gpu')
+def train(run_label: str='aws-exp', in_screen: str='True') -> None:
     """Runs the TF pipeline on commodity hardware with no job queueing."""
+    in_screen = in_screen.lower() in ['1', 'true']
+    print("Running AWS task with label [{0}], {1}in a screen.".format(
+        run_label, "" if in_screen else "NOT "
+    ))
     work_dir = "/home/ubuntu/vqa/experiments"
     print("Using work dir {0}.".format(work_dir))
     _sync_code()
@@ -85,9 +71,26 @@ def _run_commodity(run_label: str, in_screen: bool) -> None:
             run(_as_conda(tf_command), shell=False, shell_escape=False)
 
 
-def _eval_commodity(experiment_id: str) -> None:
+@hosts('aws-gpu')
+def eval(experiment_id: str) -> None:
     """Evaluates the accuracy of the model trained by the given experiment."""
-    raise Exception("Not yet implemented.")
+    _sync_code()
+    print("WARNING: ignoring specified experiment ID {0}".format(experiment_id))
+
+    root = pjoin('/data', 'vqa', 'models')
+    # TODO(andrei): Always put these in the folder with experiment ID.
+    model_fname = 'mlp_num_hidden_units_1024_num_hidden_layers_3.json'
+    weight_fname = 'mlp_num_hidden_units_1024_num_hidden_layers_3_epoch_99.hdf5'
+    results_fpath = pjoin('/tmp/', 'results-changeme.txt')
+
+    model_fpath = pjoin(root, model_fname)
+    weight_fpath = pjoin(root, weight_fname)
+
+    with cd('/home/ubuntu/vqa/visualqa'):
+        run(_as_conda(
+            'python evaluateMLP.py -model {0} -weights {1} -results {2} '
+            '-dataroot /data/vqa'.format(model_fpath, weight_fpath,
+                                         results_fpath)))
 
 
 def _run_experiment(run_label: str) -> str:
