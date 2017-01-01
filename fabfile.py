@@ -80,7 +80,7 @@ def eval(experiment_id: str) -> None:
     root = pjoin('/data', 'vqa', 'models')
     # TODO(andrei): Always put these in the folder with experiment ID.
     model_fname = 'mlp_num_hidden_units_1024_num_hidden_layers_3.json'
-    weight_fname = 'mlp_num_hidden_units_1024_num_hidden_layers_3_epoch_99.hdf5'
+    weight_fname = 'mlp_num_hidden_units_1024_num_hidden_layers_3_epoch_25.hdf5'
     results_fpath = pjoin('/tmp/', 'results-changeme.txt')
 
     model_fpath = pjoin(root, model_fname)
@@ -100,7 +100,8 @@ def _run_experiment(run_label: str) -> str:
     to LFS using 'bsub' on Euler.
     """
     # return "../../visualqa/main.py"
-    return '../../visualqa/trainMLP.py -dataroot /data/vqa -batch_size 1024'
+    return '../../visualqa/trainMLP.py -dataroot /data/vqa -batch_size 512 ' \
+           '-num_epochs 150 -model_save_interval 10'
 
 
 def _sync_code(remote_code_dir='/home/ubuntu/vqa/visualqa') -> None:
