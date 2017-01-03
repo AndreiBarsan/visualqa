@@ -25,10 +25,13 @@ Notes:
 Note that even on Anaconda, you still have to use 'pip' to install 'Fabric3'.
 """
 
+import io
 from os.path import join as pjoin
 
 from fabric.api import *
 from fabric.contrib.project import rsync_project as rsync
+
+from utils import kw_to_flags, args_to_flags
 
 PYTHON2_ENV_NAME = 'dl-2.7'
 env.use_ssh_config = True
@@ -87,19 +90,58 @@ def setup_conda() -> None:
 
 
 @hosts('aws-gpu')
-def eval(experiment_id: str) -> None:
-    """Evaluates the accuracy of the model trained by the given experiment."""
-    _sync_code()
-    print("WARNING: ignoring specified experiment ID {0}".format(experiment_id))
+def eval(experiment_id: str, epoch: str='-1', *args, **kw) -> None:
+    """Evaluates the accuracy of the model trained by the given experiment.
 
-    root = pjoin('/data', 'vqa', 'models')
+    TODO(andrei): Have 'train' script print out a copy-paste-friendly version
+    of the corresponding eval script.
+
+    As of Jan 3rd, this takes ~2:57 total.
+    """
+    _sync_code()
+    epoch = int(epoch)
+
+    # print("WARNING: ignoring specified experiment ID {0}".format(experiment_id))
+
+    # root = pjoin('/data', 'vqa', 'models')
+    root = pjoin('/home', 'ubuntu', 'vqa', 'experiments')
+    experiment_folder = pjoin(root, experiment_id)
     # TODO(andrei): Always put these in the folder with experiment ID.
-    model_fname = 'mlp_num_hidden_units_1024_num_hidden_layers_3.json'
-    weight_fname = 'mlp_num_hidden_units_1024_num_hidden_layers_3_epoch_120' \
-                   '.hdf5'
+    # model_fname = 'mlp_num_hidden_units_1024_num_hidden_layers_3.json'
+
+    model_fname = 'model.json'
+    weight_fnames_raw = run('ls {0}/*.hdf5'.format(experiment_folder),
+                            stdout=io.StringIO())
+    weight_fnames = weight_fnames_raw.splitlines()
+    epoch_weight_fnames = [(_get_epoch_number(weight_fname), weight_fname)
+                           for weight_fname in weight_fnames]
+    epoch_weight_fnames.sort(key=lambda tup: tup[0])
+
+    if epoch == -1:
+        # Get the latest one
+        weight_fname = epoch_weight_fnames[-1]
+    else:
+        try:
+            weight_fname = next(fn for fn_epoch, fn in epoch_weight_fnames
+                                if fn_epoch == epoch)
+        except StopIteration:
+            # No weights saved at that epoch. Give the user info on what the
+            # closest epoch we DO have a dump for.
+            deltas = [(abs(fn_epoch - epoch), fn_epoch)
+                      for fn_epoch, _ in epoch_weight_fnames]
+            closest = min(deltas, key=lambda tup: tup[0])[1]
+            print("Could not find checkpoint for epoch #{0}. Closest epoch "
+                  "with available weights is #{1}.".format(epoch, closest))
+            return
+
+    print("Will use weights from file: [{0}]".format(weight_fname))
+
+    # weight_fname = 'mlp_num_hidden_units_1024_num_hidden_layers_3_epoch_120' \
+    #                '.hdf5'
     results_fpath = pjoin('/tmp/', 'results-changeme.txt')
-    # TODO(andrei): What are we actually evaluating on? Ideally, we want
-    # stats for both train and validation!
+
+    # TODO(andrei): Support evaluating on TRAINING data as well.
+    # TODO(andrei): Dynamically generate this file name, as required by vqaEvalDemo.py.
     results_json_fpath = pjoin('/tmp/', 'Results',
                                'OpenEnded_mscoco_val2014_baseline_results.json')
 
@@ -107,13 +149,15 @@ def eval(experiment_id: str) -> None:
     weight_fpath = pjoin(root, weight_fname)
 
     with cd('/home/ubuntu/vqa/visualqa'):
+        # Generate the predictions on the validation set...
         # run(_as_conda(
         #     'python evaluateMLP.py -model {0} -weights {1} -results {2} '
         #     '-results_json {3} -dataroot /data/vqa'.format(
         #         model_fpath, weight_fpath, results_fpath, results_json_fpath)))
 
+        # ...and measure all sorts of cool stats.
         with cd('VQA'):
-            VQA_eval_command = 'python PythonEvaluationTools/vqaEvalDemo.py'
+            VQA_eval_command = 'python PythonEvaluationTools/vqaEvalDemo.py {0}'.format(args_to_flags(args, kw))
             run(_as_conda(VQA_eval_command, PYTHON2_ENV_NAME))
 
 
@@ -137,7 +181,7 @@ def _sync_code(remote_code_dir='/home/ubuntu/vqa/visualqa') -> None:
     run('mkdir -p {0}'.format(remote_code_dir))
     rsync(remote_dir=remote_code_dir,
           local_dir='.',
-          exclude=['.git', '.idea', '*__pycache__*'])
+          exclude=['.git', '.idea', '*__pycache__*', '*.pyc'])
 
 
 def _as_conda(cmd: str, env_name='ml') -> str:
@@ -150,7 +194,7 @@ def _as_conda(cmd: str, env_name='ml') -> str:
 
 
 def _in_screen(cmd: str, screen_name: str, **kw) -> None:
-    """Runs the specified command inside a persistent screen.
+    """Runs the specified command remotely inside a persistent screen.
 
     This allows the command to properly return after kicking off a job.
     The screen persists into a regular 'bash' after the command completes.
@@ -162,4 +206,12 @@ def _in_screen(cmd: str, screen_name: str, **kw) -> None:
     screen = "screen -dmS {0} bash -c '{1} ; exec bash'".format(screen_name, cmd)
     print("Screen to run: [{0}]".format(screen))
     run(screen, pty=False, **kw)
+
+
+def _get_epoch_number(weight_fname: str) -> int:
+    """Extracts epoch number from a hdf5 weight dump file name."""
+
+    nr_str = weight_fname[weight_fname.rfind('_') + 1:
+                          weight_fname.rfind('.')]
+    return int(nr_str)
 

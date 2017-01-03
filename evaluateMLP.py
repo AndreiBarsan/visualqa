@@ -71,13 +71,17 @@ def main():
 
     nb_classes = 1000
     y_predict_text = []
-    batchSize = 128
+
+    # TODO(andrei): Configure this via args.
+    batchSize = 1024
 
     stuff = list(zip(
         grouper(questions_val, batchSize, fillvalue=questions_val[0]),
         grouper(answers_val, batchSize, fillvalue=answers_val[0]),
         grouper(images_val, batchSize, fillvalue=images_val[0])))
 
+    # TODO(andrei): Consider doing this in parallel, and on CPU, as it *may*
+    # be faster.
     with click.progressbar(stuff) as pbar:
         for (qu_batch, an_batch, im_batch) in pbar:
             X_q_batch = get_questions_matrix_sum(qu_batch, nlp)
@@ -86,6 +90,7 @@ def main():
             else:
                 X_i_batch = get_images_matrix(im_batch, img_map, VGGfeatures)
                 X_batch = np.hstack((X_q_batch, X_i_batch))
+
             y_predict = model.predict_classes(X_batch, verbose=0)
             y_predict_text.extend(labelencoder.inverse_transform(y_predict))
 

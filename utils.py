@@ -50,10 +50,16 @@ def lines(fpath: str) -> List[str]:
         return file.read().splitlines()
 
 
-def kw_to_flags(kw_map: Dict) -> str:
-    """Conversts a list of keyword arguments to a string."""
+def args_to_flags(args: List, kw_map: Dict) -> str:
+    return " ".join(args) + kw_to_flags(kw_map)
 
-    return ""
+
+def kw_to_flags(kw_map: Dict) -> str:
+    """Converts a list of keyword arguments to a string.
+
+    Assumes keys already have '--' prefixes.
+    """
+    return " ".join(("{0}={1}".format(k, v) for k, v in kw_map.items()))
 
 
 
