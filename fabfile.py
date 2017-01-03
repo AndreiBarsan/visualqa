@@ -31,14 +31,22 @@ from os.path import join as pjoin
 from fabric.api import *
 from fabric.contrib.project import rsync_project as rsync
 
-from utils import kw_to_flags, args_to_flags
+from utils import args_to_flags
 
+# Name of Anaconda environment used to run the Python 2 VQA evaluation code.
 PYTHON2_ENV_NAME = 'dl-2.7'
 env.use_ssh_config = True
 
 
 @hosts('aws-gpu')
 def preprocess(*args, **kw) -> None:
+    """Extracts useful stuff from the JSON data files.
+
+    Examples
+        Running `fab preprocess:<args>` forwards the args to the
+        `preprocess.py` script running remotely. `fab preprocess:--help`
+        shows all available flags, and so does `./preprocess.py --help`.
+    """
     _sync_code()
     work_dir = "/home/ubuntu/vqa/visualqa"
     with cd(work_dir):
@@ -117,10 +125,10 @@ def eval(experiment_id: str, epoch: str='-1', *args, **kw) -> None:
 
     if epoch == -1:
         # Get the latest one
-        weight_fname = epoch_weight_fnames[-1]
+        weight_fpath = epoch_weight_fnames[-1][1]
     else:
         try:
-            weight_fname = next(fn for fn_epoch, fn in epoch_weight_fnames
+            weight_fpath = next(fn for fn_epoch, fn in epoch_weight_fnames
                                 if fn_epoch == epoch)
         except StopIteration:
             # No weights saved at that epoch. Give the user info on what the
@@ -132,7 +140,7 @@ def eval(experiment_id: str, epoch: str='-1', *args, **kw) -> None:
                   "with available weights is #{1}.".format(epoch, closest))
             return
 
-    print("Will use weights from file: [{0}]".format(weight_fname))
+    print("Will use weights from file: [{0}]".format(weight_fpath))
 
     # weight_fname = 'mlp_num_hidden_units_1024_num_hidden_layers_3_epoch_120' \
     #                '.hdf5'
@@ -143,8 +151,7 @@ def eval(experiment_id: str, epoch: str='-1', *args, **kw) -> None:
     results_json_fpath = pjoin('/tmp/', 'Results',
                                'OpenEnded_mscoco_val2014_baseline_results.json')
 
-    model_fpath = pjoin(root, model_fname)
-    weight_fpath = pjoin(root, weight_fname)
+    model_fpath = pjoin(experiment_folder, model_fname)
 
     with cd('/home/ubuntu/vqa/visualqa'):
         # Generate the predictions on the validation set...

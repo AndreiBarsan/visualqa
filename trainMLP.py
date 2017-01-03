@@ -102,6 +102,8 @@ def main():
         id_map[id_split[0]] = int(id_split[1])
 
     print("Loading word2vec data...")
+    # TODO(andrei): Try GloVe. It should, in theory, work better. The spacy
+    # library may support them, and if not, we can always do it manually.
     nlp = English()
     print('Loaded word2vec features.')
 
@@ -109,9 +111,9 @@ def main():
     # softmax.
     img_dim = 4096
     # Standard dimensionality for word2vec embeddings.
-    # TODO(andrei): Try GloVe. It should, in theory, work better.
     word_vec_dim = 300
 
+    # Start constructing the Keras model.
     model = Sequential()
     if args.language_only:
         # Language only means we *ignore the images* and only rely on the
@@ -138,28 +140,17 @@ def main():
     # Dump the model structure so we can use it later (we dump just the raw
     # weights with every checkpoint).
     json_string = model.to_json()
-    mkdirp(pjoin(experiment_root, 'models'))
-
-    # TODO(andrei): The args pickle should contain enough data. Remove this
-    # code.
-    # if args.language_only:
-    #     model_name = 'mlp_language_only_num_hidden_units_{0}' \
-    #                  '_num_hidden_layers_{1}'.format(args.num_hidden_units,
-    #                                                  args.num_hidden_layers)
-    #     model_file_name = pjoin(experiment_root, 'models', model_name)
-    # else:
-    #     model_name = 'mlp_num_hidden_units_{0}' \
-    #                  '_num_hidden_layers_{1}'.format(args.num_hidden_units,
-    #                                                  args.num_hidden_layers)
-    #     model_file_name = pjoin(experiment_root, 'models', model_name)
-
-    model_file_name = pjoin(experiment_root, 'models', 'model')
+    # mkdirp(pjoin(experiment_root, 'models'))
+    model_file_name = pjoin(experiment_root, 'model.json')
     open(model_file_name + '.json', 'w').write(json_string)
 
     print('Compiling Keras model...')
     model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
     print('Compilation done...')
 
+    # TODO(andrei): This loop should, in theory, be GENERIC, and support any
+    # model---the baseline, LSTM+VGGfixed, LSTM+CNN, attention-based-shit, etc.
+    # TODO(andrei): Tensorboard. Keras has support for it!
     print('Training started...')
     for epoch in range(args.num_epochs):
         epoch_start_ms = int(time.time() * 1000)
@@ -193,7 +184,7 @@ def main():
 
         # Dump a checkpoint periodically.
         if epoch % args.model_save_interval == 0:
-            model_dump_fname = model_file_name + '_epoch_{:02d}.hdf5'.format(epoch)
+            model_dump_fname = pjoin(experiment_root, 'weights_{0}.hdf5'.format(epoch))
             print('Saving model to file: {0}'.format(model_dump_fname))
             model.save_weights(model_dump_fname)
 
@@ -204,7 +195,7 @@ def main():
             pass
 
     # Final checkpoint dump.
-    model.save_weights(model_file_name + '_epoch_{:02d}.hdf5'.format(epoch))
+    model.save_weights(pjoin(experiment_root, 'weights_{0}.hdf5'.format(epoch)))
 
 
 if __name__ == "__main__":
