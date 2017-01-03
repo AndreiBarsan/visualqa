@@ -38,18 +38,16 @@ env.use_ssh_config = True
 
 
 @hosts('aws-gpu')
-def preprocess() -> None:
+def preprocess(*args, **kw) -> None:
     _sync_code()
     work_dir = "/home/ubuntu/vqa/visualqa"
     with cd(work_dir):
         # Ensure we have the assets for tokenizing stuff.
         run(_as_conda('python -m spacy.en.download || echo Spacy OK'))
+
         # Extract the useful parts of the JSON inputs as text files.
-        # TODO(andrei): Parameterize this properly.
-        split = 'val'
-        answers = 'all'
-        run(_as_conda('./preprocess.py -dataroot /data/vqa -split {0} '
-                      '-answers {1}'.format(split, answers)))
+        run(_as_conda('./preprocess.py -dataroot /data/vqa {0} '.format(
+            args_to_flags(args, kw))))
 
 
 @hosts('aws-gpu')
@@ -150,10 +148,10 @@ def eval(experiment_id: str, epoch: str='-1', *args, **kw) -> None:
 
     with cd('/home/ubuntu/vqa/visualqa'):
         # Generate the predictions on the validation set...
-        # run(_as_conda(
-        #     'python evaluateMLP.py -model {0} -weights {1} -results {2} '
-        #     '-results_json {3} -dataroot /data/vqa'.format(
-        #         model_fpath, weight_fpath, results_fpath, results_json_fpath)))
+        run(_as_conda(
+            'python evaluateMLP.py -model {0} -weights {1} -results {2} '
+            '-results_json {3} -dataroot /data/vqa'.format(
+                model_fpath, weight_fpath, results_fpath, results_json_fpath)))
 
         # ...and measure all sorts of cool stats.
         with cd('VQA'):
