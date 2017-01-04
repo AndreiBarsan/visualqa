@@ -38,6 +38,7 @@ PYTHON2_ENV_NAME = 'dl-2.7'
 env.use_ssh_config = True
 
 
+@task
 @hosts('aws-gpu')
 def preprocess(*args, **kw) -> None:
     """Extracts useful stuff from the JSON data files.
@@ -58,6 +59,7 @@ def preprocess(*args, **kw) -> None:
             args_to_flags(args, kw))))
 
 
+@task
 @hosts('aws-gpu')
 def train(run_label: str='aws-exp', in_screen: str='True', *args, **kw) -> None:
     """Runs the TF pipeline on commodity hardware with no job queueing.
@@ -88,6 +90,7 @@ def train(run_label: str='aws-exp', in_screen: str='True', *args, **kw) -> None:
             run(_as_conda(tf_command), shell=False, shell_escape=False)
 
 
+@task
 @hosts('aws-gpu')
 def setup_conda() -> None:
     # Creates a Python 2.7 environment required for the official VQA
@@ -103,6 +106,18 @@ def setup_conda() -> None:
     # run('conda create -y --name ml python=3.5')
 
 
+@task(aliases=['ls', 'lsexp', 'ls_exp'])
+@hosts('aws-gpu')
+def list_experiments() -> None:
+    """Lists all available experiment names.
+
+    The experiment ID is its folder name. This is what should be passed to
+    `eval` in order to perform the evaluation of that run.
+    """
+    run('ls -l /home/ubuntu/vqa/experiments')
+
+
+@task
 @hosts('aws-gpu')
 def eval(experiment_id: str, epoch: str='-1', *args, **kw) -> None:
     """Evaluates the accuracy of the model trained by the given experiment.
@@ -118,8 +133,6 @@ def eval(experiment_id: str, epoch: str='-1', *args, **kw) -> None:
     # root = pjoin('/data', 'vqa', 'models')
     root = pjoin('/home', 'ubuntu', 'vqa', 'experiments')
     experiment_folder = pjoin(root, experiment_id)
-    # TODO(andrei): Always put these in the folder with experiment ID.
-    # model_fname = 'mlp_num_hidden_units_1024_num_hidden_layers_3.json'
 
     model_fname = 'model.json'
     weight_fnames_raw = run('ls {0}/*.hdf5'.format(experiment_folder),
@@ -148,12 +161,11 @@ def eval(experiment_id: str, epoch: str='-1', *args, **kw) -> None:
 
     print("Will use weights from file: [{0}]".format(weight_fpath))
 
-    # weight_fname = 'mlp_num_hidden_units_1024_num_hidden_layers_3_epoch_120' \
-    #                '.hdf5'
     results_fpath = pjoin('/tmp/', 'results-changeme.txt')
 
     # TODO(andrei): Support evaluating on TRAINING data as well.
-    # TODO(andrei): Dynamically generate this file name, as required by vqaEvalDemo.py.
+    # TODO(andrei): Dynamically generate this file name, as required by
+    # vqaEvalDemo.py, and save it in right in the experiment folder.
     results_json_fpath = pjoin('/tmp/', 'Results',
                                'OpenEnded_mscoco_val2014_baseline_results.json')
 
@@ -168,7 +180,8 @@ def eval(experiment_id: str, epoch: str='-1', *args, **kw) -> None:
 
         # ...and measure all sorts of cool stats.
         with cd('VQA'):
-            VQA_eval_command = 'python PythonEvaluationTools/vqaEvalDemo.py {0}'.format(args_to_flags(args, kw))
+            VQA_eval_command = 'python PythonEvaluationTools/vqaEvalDemo.py ' \
+                               '{0}'.format(args_to_flags(args, kw))
             run(_as_conda(VQA_eval_command, PYTHON2_ENV_NAME))
 
 
