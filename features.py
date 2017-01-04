@@ -33,16 +33,15 @@ def get_questions_tensor_timeseries(questions, nlp, timesteps):
 
 
 def get_questions_matrix_sum(questions, nlp):
-    '''
-    Sums the word vectors of all the tokens in a question
+    """Sums the word vectors of all the tokens in a question.
 
-    Input:
-    questions: list of unicode objects
-    nlp: an instance of the class English() from spacy.en
+    Args
+        questions: list of unicode objects
+        nlp: an instance of the class English() from spacy.en
 
-    Output:
-    A numpy array of shape: (nb_samples, word_vec_dim)
-    '''
+    Returns
+        A numpy array of shape: (nb_samples, word_vec_dim)
+    """
     # assert not isinstance(questions, basestring)
     nb_samples = len(questions)
     word_vec_dim = nlp(questions[0])[0].vector.shape[0]

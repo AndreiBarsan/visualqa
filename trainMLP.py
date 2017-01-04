@@ -6,6 +6,9 @@ In the process of adapting this to our project.
 # WARNING: this may cause weird errors when imported after Keras!
 import time
 
+import keras
+from keras.engine import Model
+
 try:
     from spacy.en import English
 except ImportError as err:
@@ -83,13 +86,11 @@ def main():
     image_ids = lines(pjoin(data_root, 'coco_vgg_IDMap.txt'))
     print('Loaded vgg features.')
 
-    # encode the remaining answers
-    # TODO(andrei): Any good reason why we're saving this?
+    # Encode the remaining (top max_answers) answers and save the mapping.
     labelencoder = preprocessing.LabelEncoder()
     labelencoder.fit(answers_train)
     nb_classes = len(list(labelencoder.classes_))
-    mkdirp(pjoin(experiment_root, 'models'))
-    with open(pjoin(experiment_root, 'models', 'labelencoder.pkl'), 'wb') as pfile:
+    with open(pjoin(experiment_root, 'labelencoder.pkl'), 'wb') as pfile:
         pickle.dump(labelencoder, pfile)
 
     # Dump the arguments so we know which parameters we used for training.
@@ -106,50 +107,20 @@ def main():
     # library may support them, and if not, we can always do it manually.
     nlp = English()
     print('Loaded word2vec features.')
-
-    # This is the size of the last fully-connected VGG layer, before the
-    # softmax.
-    img_dim = 4096
     # Standard dimensionality for word2vec embeddings.
     word_vec_dim = 300
 
-    # Start constructing the Keras model.
-    model = Sequential()
-    if args.language_only:
-        # Language only means we *ignore the images* and only rely on the
-        # question to compute an answers. Interestingly enough, this does not
-        # suck horribly.
-        model.add(Dense(args.num_hidden_units, input_dim=word_vec_dim,
-                        init='uniform'))
-    else:
-        model.add(Dense(args.num_hidden_units, input_dim=img_dim + word_vec_dim,
-                        init='uniform'))
-
-    model.add(Activation(args.activation))
-    if args.dropout > 0:
-        model.add(Dropout(args.dropout))
-    for i in range(args.num_hidden_layers - 1):
-        model.add(Dense(args.num_hidden_units, init='uniform'))
-        model.add(Activation(args.activation))
-        if args.dropout > 0:
-            model.add(Dropout(args.dropout))
-
-    model.add(Dense(nb_classes, init='uniform'))
-    model.add(Activation('softmax'))
-
+    model = build_baseline_model(args, nb_classes, word_vec_dim)
     # Dump the model structure so we can use it later (we dump just the raw
     # weights with every checkpoint).
     json_string = model.to_json()
-    # mkdirp(pjoin(experiment_root, 'models'))
     model_file_name = pjoin(experiment_root, 'model.json')
-    open(model_file_name + '.json', 'w').write(json_string)
-
-    print('Compiling Keras model...')
-    model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
-    print('Compilation done...')
+    open(model_file_name, 'w').write(json_string)
 
     # TODO(andrei): This loop should, in theory, be GENERIC, and support any
     # model---the baseline, LSTM+VGGfixed, LSTM+CNN, attention-based-shit, etc.
+    # TODO(andrei): If possible, pre-compute sums of all questions and encode
+    # all answers in advance.
     # TODO(andrei): Tensorboard. Keras has support for it!
     print('Training started...')
     for epoch in range(args.num_epochs):
@@ -168,12 +139,17 @@ def main():
                         fillvalue=answers_train[-1]),
                 grouper(images_train, args.batch_size,
                         fillvalue=images_train[-1])):
+            # Converts the question embeddings into a single vector by
+            # summing them up.
             X_q_batch = get_questions_matrix_sum(qu_batch, nlp)
             if args.language_only:
                 X_batch = X_q_batch
             else:
                 X_i_batch = get_images_matrix(im_batch, id_map, VGGfeatures)
                 X_batch = np.hstack((X_q_batch, X_i_batch))
+
+            # Converts the answers to their index (we're just doing
+            # classification at this point).
             Y_batch = get_answers_matrix(an_batch, labelencoder)
             loss = model.train_on_batch(X_batch, Y_batch)
             progbar.add(args.batch_size, values=[("train loss", loss)])
@@ -196,6 +172,45 @@ def main():
 
     # Final checkpoint dump.
     model.save_weights(pjoin(experiment_root, 'weights_{0}.hdf5'.format(epoch)))
+
+
+def build_baseline_model(
+        args,
+        nb_classes: int,
+        word_vec_dim: int
+) -> Model:
+    # This is the size of the last fully-connected VGG layer, before the
+    # softmax.
+    img_dim = 4096
+    # Start constructing the Keras model.
+    model = Sequential()
+    if args.language_only:
+        # Language only means we *ignore the images* and only rely on the
+        # question to compute an answers. Interestingly enough, this does not
+        # suck horribly.
+        model.add(Dense(args.num_hidden_units, input_dim=word_vec_dim,
+                        init='uniform'))
+    else:
+        model.add(Dense(args.num_hidden_units, input_dim=img_dim + word_vec_dim,
+                        init='uniform'))
+    model.add(Activation(args.activation))
+
+    if args.dropout > 0:
+        model.add(Dropout(args.dropout))
+
+    for i in range(args.num_hidden_layers - 1):
+        model.add(Dense(args.num_hidden_units, init='uniform'))
+        model.add(Activation(args.activation))
+        if args.dropout > 0:
+            model.add(Dropout(args.dropout))
+
+    model.add(Dense(nb_classes, init='uniform'))
+    model.add(Activation('softmax'))
+
+    print('Compiling Keras model...')
+    model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
+    print('Compilation done...')
+    return model
 
 
 if __name__ == "__main__":

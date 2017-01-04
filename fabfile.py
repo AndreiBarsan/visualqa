@@ -59,8 +59,15 @@ def preprocess(*args, **kw) -> None:
 
 
 @hosts('aws-gpu')
-def train(run_label: str='aws-exp', in_screen: str='True') -> None:
-    """Runs the TF pipeline on commodity hardware with no job queueing."""
+def train(run_label: str='aws-exp', in_screen: str='True', *args, **kw) -> None:
+    """Runs the TF pipeline on commodity hardware with no job queueing.
+
+    Examples
+        `fab train:baseline-exp,false,-h` Starts an experiment,
+        with 'baseline-exp' as its label, NOT running inside a screen,
+        and with the flag '-h' to be passed to the training script. This does
+        not train anything, and only shows the help message.
+    """
     in_screen = in_screen.lower() in ['1', 'true']
     print("Running AWS task with label [{0}], {1}in a screen.".format(
         run_label, "" if in_screen else "NOT "
@@ -70,8 +77,9 @@ def train(run_label: str='aws-exp', in_screen: str='True') -> None:
     _sync_code()
 
     with cd(work_dir):
-        ts = '$(date +%Y%m%dT%H%M%S)'
-        tf_command = ('t=' + ts + ' && mkdir $t && cd $t && python ' + _run_experiment(run_label))
+        ts = '$(date +%Y%m%dT%H%M%S)' + '-' + run_label
+        tf_command = ('t=' + ts + ' && mkdir $t && cd $t && python ' +
+                      _run_experiment(*args, **kw))
 
         if in_screen:
             _in_screen(_as_conda(tf_command), 'vqa_experiment_screen',
@@ -89,7 +97,7 @@ def setup_conda() -> None:
     run('source activate dl-2.7 && '
         'conda install -y --quiet scikit-learn scikit-image matplotlib')
 
-    # TODO-LOW(andrei): Coder for setting up the main environment as well.
+    # TODO-LOW(andrei): Code for setting up the main environment as well.
     # Note: this env is already included in Andrei's AWS AMI (if you're using
     # that, and are not on Azure) under the name 'ml'.
     # run('conda create -y --name ml python=3.5')
@@ -106,8 +114,6 @@ def eval(experiment_id: str, epoch: str='-1', *args, **kw) -> None:
     """
     _sync_code()
     epoch = int(epoch)
-
-    # print("WARNING: ignoring specified experiment ID {0}".format(experiment_id))
 
     # root = pjoin('/data', 'vqa', 'models')
     root = pjoin('/home', 'ubuntu', 'vqa', 'experiments')
@@ -166,15 +172,19 @@ def eval(experiment_id: str, epoch: str='-1', *args, **kw) -> None:
             run(_as_conda(VQA_eval_command, PYTHON2_ENV_NAME))
 
 
-def _run_experiment(run_label: str) -> str:
+def _run_experiment(*args, **kw) -> str:
     """This is the command for training the model.
 
     It is called inside a screen right away when running on AWS, and submitted
     to LFS using 'bsub' on Euler.
     """
     # return "../../visualqa/main.py"
-    return '../../visualqa/trainMLP.py -dataroot /data/vqa -batch_size 512 ' \
-           '-num_epochs 150 -model_save_interval 10'
+    if '-batch_size' not in kw:
+        kw['-batch_size'] = 512
+    if '-dataroot' not in kw:
+        kw['-dataroot'] = '/data/vqa'
+
+    return '../../visualqa/trainMLP.py {0}'.format(args_to_flags(args, kw))
 
 
 def _sync_code(remote_code_dir='/home/ubuntu/vqa/visualqa') -> None:
