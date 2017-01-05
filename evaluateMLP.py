@@ -73,7 +73,7 @@ def main():
     y_predict_text = []
 
     # TODO(andrei): Configure this via args.
-    batchSize = 1024
+    batchSize = 512
 
     stuff = list(zip(
         grouper(questions_val, batchSize, fillvalue=questions_val[0]),

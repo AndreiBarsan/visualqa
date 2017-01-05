@@ -70,7 +70,7 @@ def train(run_label: str='aws-exp', in_screen: str='True', *args, **kw) -> None:
         and with the flag '-h' to be passed to the training script. This does
         not train anything, and only shows the help message.
     """
-    in_screen = in_screen.lower() in ['1', 'true']
+    in_screen = parse_bool(in_screen)
     print("Running AWS task with label [{0}], {1}in a screen.".format(
         run_label, "" if in_screen else "NOT "
     ))
@@ -114,7 +114,14 @@ def list_experiments() -> None:
     The experiment ID is its folder name. This is what should be passed to
     `eval` in order to perform the evaluation of that run.
     """
-    run('ls -l /home/ubuntu/vqa/experiments')
+    result = run('ls -lt /home/ubuntu/vqa/experiments/', stdout=io.StringIO())
+    print("Available experiment results (newest first):")
+    for line in result.splitlines():
+        if 'total' in line: continue
+
+        # Sample line: drwxrwxr-x 2 ubuntu ubuntu 4096 Jan  3 18:51 20170101T141639
+        perms, link_count, user, group, size, month, day, time, name = line.split()
+        print("\tID {0} ({1} {2} at {3})".format(name, month, day, time))
 
 
 @task
@@ -129,6 +136,22 @@ def eval(experiment_id: str, epoch: str='-1', *args, **kw) -> None:
     """
     _sync_code()
     epoch = int(epoch)
+    eval_on = 'val'
+    experiment_label = 'baseline' # TODO(andrei): Set dynamically.
+    dataset_label_map = {
+        'val': 'val2014',
+        'train': 'train2014',
+        'test-dev': 'test-dev2015',
+        'test': 'test2015'
+    }
+    # Whether to assume the actual answers have already been computed. Useful
+    # if you only want to quickly recompute the accuracy and other stats.
+    skip_answer_computation = parse_bool(
+        kw.get('skip_answer_computation', 'False'))
+    if 'skip_answer_computation' in kw: del kw['skip_answer_computation']
+    if skip_answer_computation:
+        print("WARNING: will NOT recompute the answers from scratch, and will "
+              "just recompute statistics. Ignoring epoch parameter.")
 
     # root = pjoin('/data', 'vqa', 'models')
     root = pjoin('/home', 'ubuntu', 'vqa', 'experiments')
@@ -161,27 +184,30 @@ def eval(experiment_id: str, epoch: str='-1', *args, **kw) -> None:
 
     print("Will use weights from file: [{0}]".format(weight_fpath))
 
-    results_fpath = pjoin('/tmp/', 'results-changeme.txt')
+    results_fpath = pjoin(experiment_folder, 'results-{0}.txt'.format(eval_on))
 
-    # TODO(andrei): Support evaluating on TRAINING data as well.
-    # TODO(andrei): Dynamically generate this file name, as required by
-    # vqaEvalDemo.py, and save it in right in the experiment folder.
-    results_json_fpath = pjoin('/tmp/', 'Results',
-                               'OpenEnded_mscoco_val2014_baseline_results.json')
+    # TODO(andrei): Fully support evaluating on TRAINING data as well (and
+    # test that it works).
+    results_json_fpath = pjoin(experiment_folder,
+                               'OpenEnded_mscoco_{0}_{1}_results.json'.format(
+                                   dataset_label_map[eval_on],
+                                   experiment_label
+                               ))
 
     model_fpath = pjoin(experiment_folder, model_fname)
-
     with cd('/home/ubuntu/vqa/visualqa'):
-        # Generate the predictions on the validation set...
-        run(_as_conda(
-            'python evaluateMLP.py -model {0} -weights {1} -results {2} '
-            '-results_json {3} -dataroot /data/vqa'.format(
-                model_fpath, weight_fpath, results_fpath, results_json_fpath)))
+        if not skip_answer_computation:
+            # Generate the predictions on the validation set...
+            run(_as_conda(
+                'python evaluateMLP.py -model {0} -weights {1} -results {2} '
+                '-results_json {3} -dataroot /data/vqa'.format(
+                    model_fpath, weight_fpath, results_fpath, results_json_fpath)))
 
         # ...and measure all sorts of cool stats.
         with cd('VQA'):
             VQA_eval_command = 'python PythonEvaluationTools/vqaEvalDemo.py ' \
-                               '{0}'.format(args_to_flags(args, kw))
+                               '{0} {1}'.format(experiment_folder,
+                                                args_to_flags(args, kw))
             run(_as_conda(VQA_eval_command, PYTHON2_ENV_NAME))
 
 
@@ -242,4 +268,9 @@ def _get_epoch_number(weight_fname: str) -> int:
     nr_str = weight_fname[weight_fname.rfind('_') + 1:
                           weight_fname.rfind('.')]
     return int(nr_str)
+
+
+def parse_bool(input: str) -> bool:
+    """Dirty, dirty, parsing."""
+    return input.lower() in ['1', 'true']
 
