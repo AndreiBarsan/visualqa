@@ -4,11 +4,6 @@ In the process of adapting this to our project.
 """
 
 # WARNING: this may cause weird errors when imported after Keras!
-import time
-
-import keras
-from keras.engine import Model
-
 try:
     from spacy.en import English
 except ImportError as err:
@@ -17,6 +12,9 @@ except ImportError as err:
           "that it is the first thing you import in a Python program.")
     raise
 
+import time
+import keras
+from keras.engine import Model
 
 import argparse
 import pickle
