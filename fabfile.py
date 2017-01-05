@@ -100,7 +100,7 @@ def setup_conda() -> None:
     run('source activate dl-2.7 && '
         'conda install -y --quiet scikit-learn scikit-image matplotlib spacy')
     run('. activate ml && conda install spacy')
-
+    run('. activate ml && conda install keras')
     # TODO-LOW(andrei): Code for setting up the main environment as well.
     # Note: this env is already included in Andrei's AWS AMI (if you're using
     # that, and are not on Azure) under the name 'ml'.

@@ -60,3 +60,7 @@ cd ..
 
 cd ..
 mkdir Preprocessed
+
+wget http://cs.stanford.edu/people/karpathy/deepimagesent/coco.zip
+unzipRemove
+https://raw.githubusercontent.com/avisingh599/visual-qa/master/features/coco_vgg_IDMap.txt
