@@ -98,7 +98,8 @@ def setup_conda() -> None:
     run('conda create -y --quiet --name dl-2.7 python=2.7 || echo Environment '
         '\'dl-2.7\' probably already exists.')
     run('source activate dl-2.7 && '
-        'conda install -y --quiet scikit-learn scikit-image matplotlib')
+        'conda install -y --quiet scikit-learn scikit-image matplotlib spacy')
+    run('. activate ml && conda install spacy')
 
     # TODO-LOW(andrei): Code for setting up the main environment as well.
     # Note: this env is already included in Andrei's AWS AMI (if you're using
