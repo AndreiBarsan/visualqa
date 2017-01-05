@@ -3,8 +3,6 @@ Evaluates a model trained by `trainMLP`.
 
 TODO(andrei): Integrate with training script for convenience.
 """
-import click
-
 try:
     # Keep this import on top!
     from spacy.en import English
@@ -12,6 +10,7 @@ except:
     # Shit, son.
     raise
 
+import click
 from os.path import join as pjoin
 import sys
 import argparse
