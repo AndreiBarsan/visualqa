@@ -85,10 +85,10 @@ def main():
             # for now you have to plug it in manually
             X_q_batch = get_questions_matrix_sum(qu_batch, nlp)
             if 'language_only' in args.model:
+                y_predict = model.predict_classes([X_q_batch], verbose=0)
+            else:
                 X_i_batch = get_images_matrix(im_batch, img_map, VGGfeatures)
                 y_predict = model.predict_classes([X_q_batch, X_i_batch], verbose=0)
-            else:
-                y_predict = model.predict_classes([X_q_batch], verbose=0)
             # TODO(Bernhard): verify that predict_classes sets dropout to 0
             y_predict_text.extend(labelencoder.inverse_transform(y_predict))
 
