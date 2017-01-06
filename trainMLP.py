@@ -107,9 +107,10 @@ def main():
     # Standard dimensionality for word2vec embeddings.
     word_vec_dim = 300
 
-    model = vqa_model.VqaModel().get_model(args.language_only, args.num_hidden_units,
+    vqamodel = vqa_model.VqaModel(args.language_only, args.num_hidden_units,
                      word_vec_dim, args.activation, args.dropout,
                      args.num_hidden_layers, nb_classes)
+    model = vqamodel.getmodel()
     # Dump the model structure so we can use it later (we dump just the raw
     # weights with every checkpoint).
     json_string = model.to_json()

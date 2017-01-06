@@ -7,7 +7,7 @@ class VqaModel(object):
     A multi layer neural network for visual question answering
     """
 
-    def get_model(self, language_only, num_hidden_units, word_vec_dim,
+    def __init__(self, language_only, num_hidden_units, word_vec_dim,
                  activation, dropout, num_hidden_layers, nb_classes):
         """
         :param language_only: use a language model only to answer question and ignore images
@@ -57,4 +57,7 @@ class VqaModel(object):
         print('Compiling Keras model...')
         model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
         print('Compilation done...')
-        return model
+        self._model = model
+
+    def getmodel(self):
+        return self._model
