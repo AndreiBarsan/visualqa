@@ -13,25 +13,21 @@ except ImportError as err:
     raise
 
 import time
-import keras
-from keras.engine import Model
-
 import argparse
 import pickle
 from os.path import join as pjoin
 from random import shuffle
-from typing import List
 
 import numpy as np
 import scipy.io
-from keras.layers import Dense, Dropout, Activation
-from keras.models import Sequential
 from keras.utils import generic_utils
 from sklearn import preprocessing
 
 from features import get_images_matrix, get_answers_matrix
 from features import get_questions_matrix_sum
-from utils import select_frequent_answers, mkdirp, grouper, lines
+from utils import select_frequent_answers, grouper, lines
+
+from model import vqa_model
 
 
 def main():
@@ -59,6 +55,9 @@ def main():
     data_root = args.dataroot
     experiment_root = args.experiment_root
 
+    # Load data needed for training and save all parameters/mappings to make
+    # sure experiments are reproducible
+
     q_train_fpath = pjoin(data_root, 'Preprocessed', 'questions_train2014.txt')
     a_train_fpath = pjoin(data_root, 'Preprocessed', 'answers_train2014_modal.txt')
     i_train_fpath = pjoin(data_root, 'Preprocessed', 'images_train2014.txt')
@@ -80,7 +79,7 @@ def main():
 
     print("Loading VGG features...")
     features_struct = scipy.io.loadmat(pretrained_vgg_model_fpath)
-    VGGfeatures = features_struct['feats']
+    vGGfeatures = features_struct['feats']
     image_ids = lines(pjoin(data_root, 'coco_vgg_IDMap.txt'))
     print('Loaded vgg features.')
 
@@ -108,12 +107,17 @@ def main():
     # Standard dimensionality for word2vec embeddings.
     word_vec_dim = 300
 
-    model = build_baseline_model(args, nb_classes, word_vec_dim)
+    vqamodel = vqa_model.VqaModel(args.language_only, args.num_hidden_units,
+                     word_vec_dim, args.activation, args.dropout,
+                     args.num_hidden_layers, nb_classes)
+    model = vqamodel.getmodel()
     # Dump the model structure so we can use it later (we dump just the raw
     # weights with every checkpoint).
     json_string = model.to_json()
     model_file_name = pjoin(experiment_root, 'model.json')
     open(model_file_name, 'w').write(json_string)
+
+    # The training part starts here
 
     # TODO(andrei): This loop should, in theory, be GENERIC, and support any
     # model---the baseline, LSTM+VGGfixed, LSTM+CNN, attention-based-shit, etc.
@@ -143,7 +147,7 @@ def main():
             if args.language_only:
                 X_batch = X_q_batch
             else:
-                X_i_batch = get_images_matrix(im_batch, id_map, VGGfeatures)
+                X_i_batch = get_images_matrix(im_batch, id_map, vGGfeatures)
                 X_batch = np.hstack((X_q_batch, X_i_batch))
 
             # Converts the answers to their index (we're just doing
@@ -170,46 +174,6 @@ def main():
 
     # Final checkpoint dump.
     model.save_weights(pjoin(experiment_root, 'weights_{0}.hdf5'.format(epoch)))
-
-
-def build_baseline_model(
-        args,
-        nb_classes: int,
-        word_vec_dim: int
-) -> Model:
-    # This is the size of the last fully-connected VGG layer, before the
-    # softmax.
-    img_dim = 4096
-    # Start constructing the Keras model.
-    model = Sequential()
-    if args.language_only:
-        # Language only means we *ignore the images* and only rely on the
-        # question to compute an answers. Interestingly enough, this does not
-        # suck horribly.
-        model.add(Dense(args.num_hidden_units, input_dim=word_vec_dim,
-                        init='uniform'))
-    else:
-        model.add(Dense(args.num_hidden_units, input_dim=img_dim + word_vec_dim,
-                        init='uniform'))
-    model.add(Activation(args.activation))
-
-    if args.dropout > 0:
-        model.add(Dropout(args.dropout))
-
-    for i in range(args.num_hidden_layers - 1):
-        model.add(Dense(args.num_hidden_units, init='uniform'))
-        model.add(Activation(args.activation))
-        if args.dropout > 0:
-            model.add(Dropout(args.dropout))
-
-    model.add(Dense(nb_classes, init='uniform'))
-    model.add(Activation('softmax'))
-
-    print('Compiling Keras model...')
-    model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
-    print('Compilation done...')
-    return model
-
 
 if __name__ == "__main__":
     main()
