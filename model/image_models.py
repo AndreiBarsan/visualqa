@@ -20,7 +20,6 @@ class AImageModel(ABC):
         """
         pass
 
-    @abstractmethod
     def process_input(self, image_features):
         """
         Processing the input is model specific. This method is called
@@ -38,9 +37,11 @@ class VGGImageModel(AImageModel):
     as image features. The convolutions are not caluclated but pre-computed
     image features are looked up and directly plugged into the network.
     """
-    def __init__(self, image_feature_size):
+    def __init__(self):
+        # Dimensionality of image features
+        img_dim = 4096
         self._model = Sequential()
-        self._model.add(Reshape(input_shape=(image_feature_size,), target_shape=(image_feature_size,)))
+        self._model.add(Reshape(input_shape=(img_dim,), target_shape=(img_dim,)))
 
     def model(self):
         return self._model
@@ -55,4 +56,5 @@ class VGGImageModel(AImageModel):
         VGGfeatures: 	A numpy array of shape (nb_dimensions,nb_images)
         :return: A numpy matrix of size (nb_samples, nb_dimensions)
         """
-        get_images_matrix(image_features[0], image_features[1], image_features[2])
+        (img_coco_ids, img_map, vgg_features) = image_features
+        return get_images_matrix(img_coco_ids, img_map, vgg_features)
