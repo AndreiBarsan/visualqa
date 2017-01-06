@@ -51,5 +51,6 @@ class VqaModel(object):
         print('Compilation done...')
         self._model = model
 
-    def get_model(self):
+    @property
+    def model(self):
         return self._model
