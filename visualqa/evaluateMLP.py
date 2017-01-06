@@ -12,11 +12,9 @@ except:
 
 import click
 from os.path import join as pjoin
-import sys
 import argparse
 from keras.models import model_from_json
 
-import numpy as np
 import scipy.io
 from sklearn.externals import joblib
 
@@ -84,13 +82,10 @@ def main():
     with click.progressbar(stuff) as pbar:
         for (qu_batch, an_batch, im_batch) in pbar:
             X_q_batch = get_questions_matrix_sum(qu_batch, nlp)
-            if 'language_only' in args.model:
-                X_batch = X_q_batch
-            else:
-                X_i_batch = get_images_matrix(im_batch, img_map, VGGfeatures)
-                X_batch = np.hstack((X_q_batch, X_i_batch))
-
-            y_predict = model.predict_classes(X_batch, verbose=0)
+            X_i_batch = get_images_matrix(im_batch, img_map, VGGfeatures)
+            # TODO(Bernhard): make this choose the right preprocessing and right model...
+            y_predict = model.predict_classes([X_q_batch, X_i_batch], verbose=0)
+            # TODO(Bernhard): verify that predict_classes sets dropout to 0
             y_predict_text.extend(labelencoder.inverse_transform(y_predict))
 
     correct_val = 0.0
