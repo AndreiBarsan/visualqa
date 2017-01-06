@@ -81,10 +81,14 @@ def main():
     # be faster.
     with click.progressbar(stuff) as pbar:
         for (qu_batch, an_batch, im_batch) in pbar:
+            # TODO(Bernhard): make this choose the right preprocessing and right model,
+            # for now you have to plug it in manually
             X_q_batch = get_questions_matrix_sum(qu_batch, nlp)
-            X_i_batch = get_images_matrix(im_batch, img_map, VGGfeatures)
-            # TODO(Bernhard): make this choose the right preprocessing and right model...
-            y_predict = model.predict_classes([X_q_batch, X_i_batch], verbose=0)
+            if 'language_only' in args.model:
+                X_i_batch = get_images_matrix(im_batch, img_map, VGGfeatures)
+                y_predict = model.predict_classes([X_q_batch, X_i_batch], verbose=0)
+            else:
+                y_predict = model.predict_classes([X_q_batch], verbose=0)
             # TODO(Bernhard): verify that predict_classes sets dropout to 0
             y_predict_text.extend(labelencoder.inverse_transform(y_predict))
 

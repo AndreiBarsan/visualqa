@@ -49,13 +49,12 @@ class SumUpLanguageModel(ALanguageModel):
     """
 
     def __init__(self):
-        print('Loading word2vec data...')
-        # TODO(andrei): Try GloVe. It should, in theory, work better. The spacy
-        # library may support them, and if not, we can always do it manually.
+        print('Loading glove data...')
         self._nlp = English()
+        # TODO(Bernhard): try word2vec instead of glove..
         print('Done.')
 
-        # embedding_dims of word2vec
+        # embedding_dims of glove
         embedding_dims = 300
 
         self._model = Sequential()

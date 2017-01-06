@@ -90,7 +90,6 @@ def construct_model(args, data_root, experiment_root, nb_classes):
 
 
 def main():
-    # parse arguments:
     args = parse_arguments()
 
     data_root = args.dataroot
@@ -172,7 +171,7 @@ def main():
             # TODO(andrei): Implement this in a neat way.
             pass
 
-    epoch = "final"
+    #TODO(Bernhard): catch control+c and store last parameters...
     # Final checkpoint dump.
     model.save_weights(pjoin(experiment_root, 'weights_{0}.hdf5'.format(epoch)))
 
