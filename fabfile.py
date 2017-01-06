@@ -31,7 +31,7 @@ from os.path import join as pjoin
 from fabric.api import *
 from fabric.contrib.project import rsync_project as rsync
 
-from utils import args_to_flags
+from visualqa.utils import args_to_flags
 
 # Name of Anaconda environment used to run the Python 2 VQA evaluation code.
 PYTHON2_ENV_NAME = 'dl-2.7'
@@ -55,7 +55,7 @@ def preprocess(*args, **kw) -> None:
         run(_as_conda('python -m spacy.en.download || echo Spacy OK'))
 
         # Extract the useful parts of the JSON inputs as text files.
-        run(_as_conda('./preprocess.py -dataroot /data/vqa {0} '.format(
+        run(_as_conda('./visualqa/preprocess.py -dataroot /data/vqa {0} '.format(
             args_to_flags(args, kw))))
 
 
@@ -200,7 +200,7 @@ def eval(experiment_id: str, epoch: str='-1', *args, **kw) -> None:
         if not skip_answer_computation:
             # Generate the predictions on the validation set...
             run(_as_conda(
-                'python evaluateMLP.py -model {0} -weights {1} -results {2} '
+                'python ./visualqa/evaluateMLP.py -model {0} -weights {1} -results {2} '
                 '-results_json {3} -dataroot /data/vqa'.format(
                     model_fpath, weight_fpath, results_fpath, results_json_fpath)))
 
@@ -224,7 +224,7 @@ def _run_experiment(*args, **kw) -> str:
     if '-dataroot' not in kw:
         kw['-dataroot'] = '/data/vqa'
 
-    return '../../visualqa/trainMLP.py {0}'.format(args_to_flags(args, kw))
+    return '../../visualqa/visualqa/trainMLP.py {0}'.format(args_to_flags(args, kw))
 
 
 def _sync_code(remote_code_dir='/home/ubuntu/vqa/visualqa') -> None:

@@ -1,3 +1,12 @@
+# WARNING: this may cause weird errors when imported after Keras!
+try:
+    from spacy.en import English
+except ImportError as err:
+    print("Please make sure you have the `spacy` Python package installed, "
+          "that you downloaded its assets (`python -m spacy.en.download`), and "
+          "that it is the first thing you import in a Python program.")
+    raise
+
 from abc import ABC, abstractmethod
 from keras.models import Sequential
 from keras.layers.core import Reshape
@@ -21,18 +30,16 @@ class ALanguageModel(ABC):
         pass
 
     @abstractmethod
-    def process_input(self, question, embeddings):
+    def process_input(self, question):
         """
         Processing the input is model specific. While an easy
         model would just sum up embedding vectors, more advanced
         models might use a LSTM layer. This method is called in training
         and testing and should return the input vector for the neural
-        network. for a given question and the corresponding word embeddings.
+        network for a given question.
         :param question: a list of unicode objects
-        :param embeddings: instance of the class English() from spacy.en
         :return: the input vector for the language model
         """
-        # TODO(Bernhard) make this independent of spacy.en
         pass
 
 
@@ -41,12 +48,21 @@ class SumUpLanguageModel(ALanguageModel):
     Easiest language model: sums up all the word embeddings.
     """
 
-    def __init__(self, embedding_dims):
+    def __init__(self):
+        print('Loading word2vec data...')
+        # TODO(andrei): Try GloVe. It should, in theory, work better. The spacy
+        # library may support them, and if not, we can always do it manually.
+        self._nlp = English()
+        print('Done.')
+
+        # embedding_dims of word2vec
+        embedding_dims = 300
+
         self._model = Sequential()
         self._model.add(Reshape(input_shape=(embedding_dims,), target_shape=(embedding_dims,)))
 
     def model(self):
         return self._model
 
-    def process_input(self, question, embeddings):
-        return get_questions_matrix_sum(question, embeddings)
+    def process_input(self, question):
+        return get_questions_matrix_sum(question, self._nlp)

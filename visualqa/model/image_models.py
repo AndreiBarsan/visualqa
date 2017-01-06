@@ -1,8 +1,15 @@
 from abc import ABC, abstractmethod
+
 from keras.models import Sequential
 from keras.layers.core import Reshape
 
 from features import get_images_matrix
+
+from os.path import join as pjoin
+
+from utils import lines
+
+import scipy.io
 
 
 class AImageModel(ABC):
@@ -20,12 +27,12 @@ class AImageModel(ABC):
         """
         pass
 
-    def process_input(self, image_features):
+    def process_input(self, image_batch):
         """
         Processing the input is model specific. This method is called
         in training and testing and should return the input to the neural
-        net for a given image.
-        :param image_features: whatever is needed to compute the input
+        net for a given image batch.
+        :param image_batch: the batch of images
         :return: the input vector for the image model
         """
         pass
@@ -37,16 +44,29 @@ class VGGImageModel(AImageModel):
     as image features. The convolutions are not caluclated but pre-computed
     image features are looked up and directly plugged into the network.
     """
-    def __init__(self):
+    def __init__(self, data_root):
         # Dimensionality of image features
         img_dim = 4096
         self._model = Sequential()
         self._model.add(Reshape(input_shape=(img_dim,), target_shape=(img_dim,)))
 
+        # Load the precomputed VGG features
+        print("Loading VGG features...")
+        pretrained_vgg_model_fpath = pjoin(data_root, 'coco', 'vgg_feats.mat')
+        features_struct = scipy.io.loadmat(pretrained_vgg_model_fpath)
+        self._vgg_features = features_struct['feats']
+        image_ids = lines(pjoin(data_root, 'coco_vgg_IDMap.txt'))
+        print ("Done.")
+
+        self._id_map = {}
+        for ids in image_ids:
+            id_split = ids.split()
+            self._id_map[id_split[0]] = int(id_split[1])
+
     def model(self):
         return self._model
 
-    def process_input(self, image_features):
+    def process_input(self, image_batch):
         """
         :param a triple:
         img_coco_ids: 	A list of strings, each string corresponding to
@@ -56,5 +76,4 @@ class VGGImageModel(AImageModel):
         VGGfeatures: 	A numpy array of shape (nb_dimensions,nb_images)
         :return: A numpy matrix of size (nb_samples, nb_dimensions)
         """
-        (img_coco_ids, img_map, vgg_features) = image_features
-        return get_images_matrix(img_coco_ids, img_map, vgg_features)
+        return get_images_matrix(image_batch, self._id_map, self._vgg_features)
