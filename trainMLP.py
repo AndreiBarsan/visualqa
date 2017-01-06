@@ -3,22 +3,12 @@ Baseline from: https://avisingh599.github.io/deeplearning/visual-qa/
 In the process of adapting this to our project.
 """
 
-# WARNING: this may cause weird errors when imported after Keras!
-try:
-    from spacy.en import English
-except ImportError as err:
-    print("Please make sure you have the `spacy` Python package installed, "
-          "that you downloaded its assets (`python -m spacy.en.download`), and "
-          "that it is the first thing you import in a Python program.")
-    raise
-
 import time
 import argparse
 import pickle
 from os.path import join as pjoin
 from random import shuffle
 
-import scipy.io
 from keras.utils import generic_utils
 from sklearn import preprocessing
 
@@ -28,28 +18,25 @@ from utils import select_frequent_answers, grouper, lines
 from model import vqa_model, language_models, image_models
 
 
-def construct_models(args, nb_classes):
-    # Standard dimensionality for word2vec embeddings
-    word_vec_dim = 300
+def load_train_data(data_root):
+    """
+    load the training data and return the loaded questions, answers and images
+    """
+    q_train_fpath = pjoin(data_root, 'Preprocessed', 'questions_train2014.txt')
+    a_train_fpath = pjoin(data_root, 'Preprocessed', 'answers_train2014_modal.txt')
+    i_train_fpath = pjoin(data_root, 'Preprocessed', 'images_train2014.txt')
 
-    # Dimensionality of image features
-    img_dim = 4096
+    print("Will load Q&A data...")
+    questions_train = lines(q_train_fpath)
+    answers_train = lines(a_train_fpath)
+    # IDs of the images corresponding to the Q&A pairs.
+    images_train = lines(i_train_fpath)
+    print("Done.")
 
-    # specify language model:
-    lang_model = language_models.SumUpLanguageModel(word_vec_dim)
-
-    # specify image mode:
-    img_model = image_models.VGGImageModel(img_dim)
-
-    # specify vqa mode:
-    final_model = vqa_model.VqaModel(lang_model, img_model,
-                                  args.language_only, args.num_hidden_units,
-                                  args.activation, args.dropout,
-                                  args.num_hidden_layers, nb_classes)
-    return [final_model, lang_model, img_model]
+    return questions_train, answers_train, images_train
 
 
-def main():
+def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('-num_hidden_units', type=int, default=1024)
     parser.add_argument('-num_hidden_layers', type=int, default=3)
@@ -69,25 +56,49 @@ def main():
     parser.add_argument('-model_eval_full_valid_interval', type=str,
                         default=20, help="After how many epochs to run a full "
                                          "validation-set evaluation.")
+    # get args
     args = parser.parse_args()
+    # Dump the arguments so we know which parameters we used for training.
+    with open(pjoin(args.experiment_root, 'args.pkl'), 'wb') as pfile:
+        pickle.dump(args, pfile)
+    return args
+
+
+def construct_model(args, data_root, experiment_root, nb_classes):
+    """
+    construct the final model to use in training
+    """
+    # specify language model:
+    lang_model = language_models.SumUpLanguageModel()
+
+    # specify image mode:
+    img_model = image_models.VGGImageModel(data_root)
+
+    # specify vqa mode:
+    final_model = vqa_model.VqaModel(lang_model, img_model,
+                                     args.language_only, args.num_hidden_units,
+                                     args.activation, args.dropout,
+                                     args.num_hidden_layers, nb_classes)
+
+    # Dump the model structure so we can use it later (we dump just the raw
+    # weights with every checkpoint).
+    json_string = final_model.model.to_json()
+    model_file_name = pjoin(experiment_root, 'model.json')
+    open(model_file_name, 'w').write(json_string)
+
+    return final_model, lang_model, img_model
+
+
+def main():
+    # parse arguments:
+    args = parse_arguments()
 
     data_root = args.dataroot
     experiment_root = args.experiment_root
 
     # Load data needed for training and save all parameters/mappings to make
     # sure experiments are reproducible
-
-    q_train_fpath = pjoin(data_root, 'Preprocessed', 'questions_train2014.txt')
-    a_train_fpath = pjoin(data_root, 'Preprocessed', 'answers_train2014_modal.txt')
-    i_train_fpath = pjoin(data_root, 'Preprocessed', 'images_train2014.txt')
-    pretrained_vgg_model_fpath = pjoin(data_root, 'coco', 'vgg_feats.mat')
-
-    print("Will load Q&A data...")
-    questions_train = lines(q_train_fpath)
-    answers_train = lines(a_train_fpath)
-    # IDs of the images corresponding to the Q&A pairs.
-    images_train = lines(i_train_fpath)
-    print("Done.")
+    questions_train, answers_train, images_train = load_train_data(data_root)
 
     # Since we are simplifying the problem of Visual QA to a classification
     # problem in this baseline, we want to limit the number of possible
@@ -96,12 +107,6 @@ def main():
     questions_train, answers_train, images_train = select_frequent_answers(
         questions_train, answers_train, images_train, max_answers)
 
-    print("Loading VGG features...")
-    features_struct = scipy.io.loadmat(pretrained_vgg_model_fpath)
-    vgg_features = features_struct['feats']
-    image_ids = lines(pjoin(data_root, 'coco_vgg_IDMap.txt'))
-    print('Loaded vgg features.')
-
     # Encode the remaining (top max_answers) answers and save the mapping.
     labelencoder = preprocessing.LabelEncoder()
     labelencoder.fit(answers_train)
@@ -109,33 +114,11 @@ def main():
     with open(pjoin(experiment_root, 'labelencoder.pkl'), 'wb') as pfile:
         pickle.dump(labelencoder, pfile)
 
-    # Dump the arguments so we know which parameters we used for training.
-    with open(pjoin(experiment_root, 'args.pkl'), 'wb') as pfile:
-        pickle.dump(args, pfile)
-
-    id_map = {}
-    for ids in image_ids:
-        id_split = ids.split()
-        id_map[id_split[0]] = int(id_split[1])
-
-    print("Loading word2vec data...")
-    # TODO(andrei): Try GloVe. It should, in theory, work better. The spacy
-    # library may support them, and if not, we can always do it manually.
-    nlp = English()
-    print('Loaded word2vec features.')
-
-    # construct the models
-    final_model, lang_model, img_model = construct_models(args, nb_classes)
-    model = final_model.get_model()
-
-    # Dump the model structure so we can use it later (we dump just the raw
-    # weights with every checkpoint).
-    json_string = model.to_json()
-    model_file_name = pjoin(experiment_root, 'model.json')
-    open(model_file_name, 'w').write(json_string)
+    # construct the model
+    final_model, lang_model, img_model = construct_model(args, data_root, experiment_root, nb_classes)
+    model = final_model.model
 
     # The training part starts here
-
     # TODO(andrei): If possible, pre-compute sums of all questions and encode
     # all answers in advance.
     # TODO(andrei): Tensorboard. Keras has support for it!
@@ -158,18 +141,17 @@ def main():
                         fillvalue=images_train[-1])):
 
             # Extract batch vectors to train on
-
             # Converts the answers to their index (we're just doing
             # classification at this point)
             y_batch = get_answers_matrix(an_batch, labelencoder)
 
             # train on language only or language and image both
             if args.language_only:
-                x_q_batch = lang_model.process_input(qu_batch, nlp)
+                x_q_batch = lang_model.process_input(qu_batch)
                 loss = model.train_on_batch(x_q_batch, y_batch)
             else:
-                x_q_batch = lang_model.process_input(qu_batch, nlp)
-                x_i_batch = img_model.process_input((im_batch, id_map, vgg_features))
+                x_q_batch = lang_model.process_input(qu_batch)
+                x_i_batch = img_model.process_input(im_batch)
                 loss = model.train_on_batch([x_q_batch, x_i_batch], y_batch)
 
             progbar.add(args.batch_size, values=[("train loss", loss)])
@@ -190,6 +172,7 @@ def main():
             # TODO(andrei): Implement this in a neat way.
             pass
 
+    epoch = "final"
     # Final checkpoint dump.
     model.save_weights(pjoin(experiment_root, 'weights_{0}.hdf5'.format(epoch)))
 
