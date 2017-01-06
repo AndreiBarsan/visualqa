@@ -18,16 +18,35 @@ import pickle
 from os.path import join as pjoin
 from random import shuffle
 
-import numpy as np
 import scipy.io
 from keras.utils import generic_utils
 from sklearn import preprocessing
 
-from features import get_images_matrix, get_answers_matrix
-from features import get_questions_matrix_sum
+from features import get_answers_matrix
 from utils import select_frequent_answers, grouper, lines
 
-from model import vqa_model
+from model import vqa_model, language_models, image_models
+
+
+def construct_models(args, nb_classes):
+    # Standard dimensionality for word2vec embeddings
+    word_vec_dim = 300
+
+    # Dimensionality of image features
+    img_dim = 4096
+
+    # specify language model:
+    lang_model = language_models.SumUpLanguageModel(word_vec_dim)
+
+    # specify image mode:
+    img_model = image_models.VGGImageModel(img_dim)
+
+    # specify vqa mode:
+    final_model = vqa_model.VqaModel(lang_model, img_model,
+                                  args.language_only, args.num_hidden_units,
+                                  args.activation, args.dropout,
+                                  args.num_hidden_layers, nb_classes)
+    return [final_model, lang_model, img_model]
 
 
 def main():
@@ -79,7 +98,7 @@ def main():
 
     print("Loading VGG features...")
     features_struct = scipy.io.loadmat(pretrained_vgg_model_fpath)
-    vGGfeatures = features_struct['feats']
+    vgg_features = features_struct['feats']
     image_ids = lines(pjoin(data_root, 'coco_vgg_IDMap.txt'))
     print('Loaded vgg features.')
 
@@ -104,13 +123,11 @@ def main():
     # library may support them, and if not, we can always do it manually.
     nlp = English()
     print('Loaded word2vec features.')
-    # Standard dimensionality for word2vec embeddings.
-    word_vec_dim = 300
 
-    vqamodel = vqa_model.VqaModel(args.language_only, args.num_hidden_units,
-                     word_vec_dim, args.activation, args.dropout,
-                     args.num_hidden_layers, nb_classes)
-    model = vqamodel.getmodel()
+    # construct the models
+    final_model, lang_model, img_model = construct_models(args, nb_classes)
+    model = final_model.get_model()
+
     # Dump the model structure so we can use it later (we dump just the raw
     # weights with every checkpoint).
     json_string = model.to_json()
@@ -119,8 +136,6 @@ def main():
 
     # The training part starts here
 
-    # TODO(andrei): This loop should, in theory, be GENERIC, and support any
-    # model---the baseline, LSTM+VGGfixed, LSTM+CNN, attention-based-shit, etc.
     # TODO(andrei): If possible, pre-compute sums of all questions and encode
     # all answers in advance.
     # TODO(andrei): Tensorboard. Keras has support for it!
@@ -141,19 +156,22 @@ def main():
                         fillvalue=answers_train[-1]),
                 grouper(images_train, args.batch_size,
                         fillvalue=images_train[-1])):
-            # Converts the question embeddings into a single vector by
-            # summing them up.
-            X_q_batch = get_questions_matrix_sum(qu_batch, nlp)
-            if args.language_only:
-                X_batch = X_q_batch
-            else:
-                X_i_batch = get_images_matrix(im_batch, id_map, vGGfeatures)
-                X_batch = np.hstack((X_q_batch, X_i_batch))
+
+            # Extract batch vectors to train on
 
             # Converts the answers to their index (we're just doing
-            # classification at this point).
-            Y_batch = get_answers_matrix(an_batch, labelencoder)
-            loss = model.train_on_batch(X_batch, Y_batch)
+            # classification at this point)
+            y_batch = get_answers_matrix(an_batch, labelencoder)
+
+            # train on language only or language and image both
+            if args.language_only:
+                x_q_batch = lang_model.process_input(qu_batch, nlp)
+                loss = model.train_on_batch(x_q_batch, y_batch)
+            else:
+                x_q_batch = lang_model.process_input(qu_batch, nlp)
+                x_i_batch = img_model.process_input((im_batch, id_map, vgg_features))
+                loss = model.train_on_batch([x_q_batch, x_i_batch], y_batch)
+
             progbar.add(args.batch_size, values=[("train loss", loss)])
 
         epoch_end_ms = int(time.time() * 1000)
@@ -174,6 +192,7 @@ def main():
 
     # Final checkpoint dump.
     model.save_weights(pjoin(experiment_root, 'weights_{0}.hdf5'.format(epoch)))
+
 
 if __name__ == "__main__":
     main()
