@@ -19,7 +19,7 @@ import scipy.io
 from sklearn.externals import joblib
 
 from features import get_questions_matrix_sum, get_images_matrix, \
-    get_answers_matrix
+    get_answers_matrix, get_questions_tensor_timeseries
 from utils import grouper, lines
 
 
@@ -80,10 +80,13 @@ def main():
     # TODO(andrei): Consider doing this in parallel, and on CPU, as it *may*
     # be faster.
     with click.progressbar(stuff) as pbar:
-        for (qu_batch, an_batch, im_batch) in pbar:
+        for (qu_batch, an_batch, im_batch) in pbar:\
+
             # TODO(Bernhard): make this choose the right preprocessing and right model,
             # for now you have to plug it in manually
-            X_q_batch = get_questions_matrix_sum(qu_batch, nlp)
+            #X_q_batch = get_questions_matrix_sum(qu_batch, nlp) # for sum up model
+            X_q_batch = get_questions_tensor_timeseries(qu_batch, nlp, 30) # for LSTM model
+            
             if 'language_only' in args.model:
                 y_predict = model.predict_classes([X_q_batch], verbose=0)
             else:

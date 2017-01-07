@@ -27,7 +27,7 @@ def get_questions_tensor_timeseries(questions, nlp, timesteps):
         tokens = nlp(questions[i])
         for j in range(len(tokens)):
             if j < timesteps:
-                questions_tensor[i, j, :] = tokens[j].vector
+                questions_tensor[i,j,:] = tokens[j].vector
 
     return questions_tensor
 

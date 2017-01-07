@@ -69,7 +69,7 @@ def construct_model(args, data_root, experiment_root, nb_classes):
     construct the final model to use in training
     """
     # specify language model:
-    lang_model = language_models.SumUpLanguageModel()
+    lang_model = language_models.LSTMLanguageModel()
 
     # specify image mode:
     img_model = image_models.VGGImageModel(data_root)
