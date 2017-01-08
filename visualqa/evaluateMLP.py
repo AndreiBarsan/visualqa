@@ -85,7 +85,7 @@ def main():
             # TODO(Bernhard): make this choose the right preprocessing and right model,
             # for now you have to plug it in manually
             #X_q_batch = get_questions_matrix_sum(qu_batch, nlp) # for sum up model
-            X_q_batch = get_questions_tensor_timeseries(qu_batch, nlp, 30) # for LSTM model
+            X_q_batch = get_questions_tensor_timeseries(qu_batch, nlp, 20) # for LSTM model
 
             if 'language_only' in args.model:
                 y_predict = model.predict_classes([X_q_batch], verbose=0)

@@ -79,15 +79,15 @@ class LSTMLanguageModel(ALanguageModel):
         embedding_dims = 300
 
         # TODO(Bernhard): make parameters below callable and invest on how they influences the perfomance
-        max_len = 30
-        num_hidden_units = 512
-        lstm_layers = 3
+        self._max_len = 20 # maximum number of words to consider in each question (fixed input length needed)
+        num_hidden_units = 256 # hidden units per lstm layer
+        lstm_layers = 1 # number of layers in the LSTM
 
         self._model = Sequential()
 
         shallow = lstm_layers == 1 # marks a one layer LSTM
 
-        self._model.add(LSTM(output_dim=num_hidden_units, return_sequences=not shallow, input_shape=(max_len, embedding_dims)))
+        self._model.add(LSTM(output_dim=num_hidden_units, return_sequences=not shallow, input_shape=(self._max_len, embedding_dims)))
         if not shallow:
             for i in range(lstm_layers-2):
                 self._model.add(LSTM(output_dim=num_hidden_units, return_sequences=True))
@@ -97,4 +97,4 @@ class LSTMLanguageModel(ALanguageModel):
         return self._model
 
     def process_input(self, question):
-        return get_questions_tensor_timeseries(question, self._nlp, 30)
+        return get_questions_tensor_timeseries(question, self._nlp, self._max_len)

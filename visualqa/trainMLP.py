@@ -44,7 +44,7 @@ def parse_arguments():
     parser.add_argument('-activation', type=str, default='tanh')
     parser.add_argument('-language_only', type=bool, default=False)
     parser.add_argument('-num_epochs', type=int, default=100)
-    parser.add_argument('-model_save_interval', type=int, default=10)
+    parser.add_argument('-model_save_interval', type=int, default=5)
     parser.add_argument('-batch_size', type=int, default=128)
     parser.add_argument('-dataroot', type=str, default='/data/vqa')
     parser.add_argument('-experiment_root', type=str, default='.',

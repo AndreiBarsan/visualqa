@@ -7,14 +7,14 @@ import numpy as np
 from keras.utils import np_utils
 
 
-def get_questions_tensor_timeseries(questions, nlp, timesteps):
+def get_questions_tensor_timeseries(questions, nlp, max_lenght):
     '''
     Returns a time series of word vectors for tokens in the question
 
     Input:
     questions: list of unicode objects
     nlp: an instance of the class English() from spacy.en
-    timesteps: the number of
+    max_lenght: the maximum number of words in each question to take into account
 
     Output:
     A numpy ndarray of shape: (nb_samples, timesteps, word_vec_dim)
@@ -22,11 +22,11 @@ def get_questions_tensor_timeseries(questions, nlp, timesteps):
     # assert not isinstance(questions, basestring)
     nb_samples = len(questions)
     word_vec_dim = nlp(questions[0])[0].vector.shape[0]
-    questions_tensor = np.zeros((nb_samples, timesteps, word_vec_dim))
+    questions_tensor = np.zeros((nb_samples, max_lenght, word_vec_dim))
     for i in range(len(questions)):
         tokens = nlp(questions[i])
         for j in range(len(tokens)):
-            if j < timesteps:
+            if j < max_lenght:
                 questions_tensor[i,j,:] = tokens[j].vector
 
     return questions_tensor
