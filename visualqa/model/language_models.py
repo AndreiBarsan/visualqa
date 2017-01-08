@@ -10,8 +10,9 @@ except ImportError as err:
 from abc import ABC, abstractmethod
 from keras.models import Sequential
 from keras.layers.core import Reshape
+from keras.layers.recurrent import LSTM
 
-from features import get_questions_matrix_sum
+from features import get_questions_matrix_sum, get_questions_tensor_timeseries
 
 
 class ALanguageModel(ABC):
@@ -65,3 +66,35 @@ class SumUpLanguageModel(ALanguageModel):
 
     def process_input(self, question):
         return get_questions_matrix_sum(question, self._nlp)
+
+
+class LSTMLanguageModel(ALanguageModel):
+    """
+    LSTM language model
+    """
+    def __init__(self):
+        print('Loading glove data...')
+        self._nlp = English()
+        print('Done.')
+        embedding_dims = 300
+
+        # TODO(Bernhard): make parameters below callable and invest on how they influences the perfomance
+        self._max_len = 20 # maximum number of words to consider in each question (fixed input length needed)
+        num_hidden_units = 256 # hidden units per lstm layer
+        lstm_layers = 1 # number of layers in the LSTM
+
+        self._model = Sequential()
+
+        shallow = lstm_layers == 1 # marks a one layer LSTM
+
+        self._model.add(LSTM(output_dim=num_hidden_units, return_sequences=not shallow, input_shape=(self._max_len, embedding_dims)))
+        if not shallow:
+            for i in range(lstm_layers-2):
+                self._model.add(LSTM(output_dim=num_hidden_units, return_sequences=True))
+            self._model.add(LSTM(output_dim=num_hidden_units, return_sequences=False))
+
+    def model(self):
+        return self._model
+
+    def process_input(self, question):
+        return get_questions_tensor_timeseries(question, self._nlp, self._max_len)

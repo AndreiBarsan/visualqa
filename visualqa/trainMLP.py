@@ -44,7 +44,7 @@ def parse_arguments():
     parser.add_argument('-activation', type=str, default='tanh')
     parser.add_argument('-language_only', type=bool, default=False)
     parser.add_argument('-num_epochs', type=int, default=100)
-    parser.add_argument('-model_save_interval', type=int, default=10)
+    parser.add_argument('-model_save_interval', type=int, default=5)
     parser.add_argument('-batch_size', type=int, default=128)
     parser.add_argument('-dataroot', type=str, default='/data/vqa')
     parser.add_argument('-experiment_root', type=str, default='.',
@@ -69,7 +69,7 @@ def construct_model(args, data_root, experiment_root, nb_classes):
     construct the final model to use in training
     """
     # specify language model:
-    lang_model = language_models.SumUpLanguageModel()
+    lang_model = language_models.LSTMLanguageModel()
 
     # specify image mode:
     img_model = image_models.VGGImageModel(data_root)
