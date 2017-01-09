@@ -14,6 +14,7 @@ from spacy.en import English
 import click
 
 # TODO(andrei): Type annotations, documentation.
+from utils import mkdirp
 
 
 def get_modal_answer(answers):
@@ -57,8 +58,12 @@ def main():
     args = parser.parse_args()
 
     # used for counting number of tokens
+    print("Starting preprocessing. Loading word vectors...")
     nlp = English()
     root = args.dataroot
+    print("Done.")
+
+    mkdirp(pjoin(root, 'Preprocessed'))
 
     fname_map = {
         'train': {

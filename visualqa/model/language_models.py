@@ -1,4 +1,6 @@
 # WARNING: this may cause weird errors when imported after Keras!
+from keras.layers import Bidirectional
+
 try:
     from spacy.en import English
 except ImportError as err:
@@ -50,7 +52,7 @@ class SumUpLanguageModel(ALanguageModel):
     """
 
     def __init__(self):
-        print('Loading glove data...')
+        print('Loading GloVe data... ', end='', flush=True)
         self._nlp = English()
         # TODO(Bernhard): try word2vec instead of glove..
         print('Done.')
@@ -69,29 +71,49 @@ class SumUpLanguageModel(ALanguageModel):
 
 
 class LSTMLanguageModel(ALanguageModel):
-    """
-    LSTM language model
-    """
-    def __init__(self):
-        print('Loading glove data...')
+    """LSTM language model with word embedding inputs."""
+    def __init__(self, lstm_num_layers, lstm_layer_size, **kw):
+        """Initializes the Keras LSTM question processing component.
+
+        Args:
+            lstm_num_layers: Number of stacked LSTM layers.
+            lstm_layer_size: Dimensionality of each LSTM unit.
+
+        Keyword Args:
+            max_sentence_length: Maximum number of words to consider in each
+                                 question, necessary at train time.
+            bidirectional: Whether to use bidirectional LSTM layers.
+        """
+        print('Loading GloVe data... ', end='', flush=True)
         self._nlp = English()
         print('Done.')
         embedding_dims = 300
 
-        # TODO(Bernhard): make parameters below callable and invest on how they influences the perfomance
-        self._max_len = 20 # maximum number of words to consider in each question (fixed input length needed)
-        num_hidden_units = 256 # hidden units per lstm layer
-        lstm_layers = 1 # number of layers in the LSTM
+        # TODO(Bernhard): Investigate how the LSTM parameters influence the
+        # overall performance.
+        self._max_len = kw.get('max_sentence_length', 20)
+        self._bidirectional = kw.get('bidirectional', False)
 
         self._model = Sequential()
+        shallow = lstm_num_layers == 1  # marks a one layer LSTM
 
-        shallow = lstm_layers == 1 # marks a one layer LSTM
-
-        self._model.add(LSTM(output_dim=num_hidden_units, return_sequences=not shallow, input_shape=(self._max_len, embedding_dims)))
+        lstm = LSTM(output_dim=lstm_layer_size,
+                    return_sequences=not shallow,
+                    input_shape=(self._max_len, embedding_dims))
+        if self._bidirectional:
+            lstm = Bidirectional(lstm)
+        self._model.add(lstm)
         if not shallow:
-            for i in range(lstm_layers-2):
-                self._model.add(LSTM(output_dim=num_hidden_units, return_sequences=True))
-            self._model.add(LSTM(output_dim=num_hidden_units, return_sequences=False))
+            for i in range(lstm_num_layers-2):
+                lstm = LSTM(output_dim=lstm_layer_size, return_sequences=True)
+                if self._bidirectional:
+                    lstm = Bidirectional(lstm)
+                self._model.add(lstm)
+
+            lstm = LSTM(output_dim=lstm_layer_size, return_sequences=False)
+            if self._bidirectional:
+                lstm = Bidirectional(lstm)
+            self._model.add(lstm)
 
     def model(self):
         return self._model

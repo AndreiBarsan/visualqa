@@ -20,7 +20,7 @@ from sklearn.externals import joblib
 
 from features import get_questions_matrix_sum, get_images_matrix, \
     get_answers_matrix, get_questions_tensor_timeseries
-from utils import grouper, lines
+from utils import grouper, lines, batchify
 
 
 def main():
@@ -50,8 +50,11 @@ def main():
     vgg_model_path = pjoin(root, 'coco', 'vgg_feats.mat')
 
     print('Model compiled, weights loaded...')
-    # TODO(andrei): If this fails, use pickle directly.
-    labelencoder = joblib.load(pjoin(root, 'models', 'labelencoder.pkl'))
+
+    # Load the encoder which converts answers to IDs, saved in the same
+    # folder as the rest of the dumps.
+    exp_root = args.weights[:args.weights.rfind('/')]
+    labelencoder = joblib.load(pjoin(exp_root, 'labelencoder.pkl'))
 
     features_struct = scipy.io.loadmat(vgg_model_path)
     VGGfeatures = features_struct['feats']
@@ -72,16 +75,9 @@ def main():
     # TODO(andrei): Configure this via args.
     batchSize = 512
 
-    stuff = list(zip(
-        grouper(questions_val, batchSize, fillvalue=questions_val[0]),
-        grouper(answers_val, batchSize, fillvalue=answers_val[0]),
-        grouper(images_val, batchSize, fillvalue=images_val[0])))
-
-    # TODO(andrei): Consider doing this in parallel, and on CPU, as it *may*
-    # be faster.
+    stuff = batchify(batchSize, questions_val, answers_val, images_val)
     with click.progressbar(stuff) as pbar:
         for (qu_batch, an_batch, im_batch) in pbar:
-
             # TODO(Bernhard): make this choose the right preprocessing and right model,
             # for now you have to plug it in manually
             #X_q_batch = get_questions_matrix_sum(qu_batch, nlp) # for sum up model

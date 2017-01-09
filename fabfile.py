@@ -37,10 +37,38 @@ from visualqa.utils import args_to_flags
 PYTHON2_ENV_NAME = 'dl-2.7'
 env.use_ssh_config = True
 
+# The remote folders with which we work.
+REMOTE_USERNAME = 'ubuntu'      # Default username on AWS instances.
+HOME_DIR = pjoin('/home', REMOTE_USERNAME)
+WORK_ROOT = pjoin(HOME_DIR, 'vqa')
+# Location where the code will reside remotely.
+CODE_ROOT = pjoin(WORK_ROOT, 'visualqa')
+# Location where the raw and preprocessed data will reside remotely.
+# This can easily be inside the work root just as well.
+DATA_ROOT = pjoin('/', 'data', 'vqa')
+# Location where experiment results, such as plots and checkpoints will
+# reside remotely.
+EXPERIMENT_ROOT = pjoin(WORK_ROOT, 'experiments')
 
-@task
+BASHRC_FPATH = pjoin(HOME_DIR, '.bashrc')
+CONDA_ACTIVATE_FPATH = pjoin(HOME_DIR, 'bin', 'anaconda3', 'bin', 'activate')
+DATA_DOWNLOAD_SCRIPT_FPATH = pjoin(CODE_ROOT, 'scripts', 'downloadDataSet.sh')
+
+
+@task()
 @hosts('aws-gpu')
-def preprocess(*args, **kw) -> None:
+def get_data(data_root=DATA_ROOT, *args, **kw) -> None:
+    """Downloads the VQA data in the specified folder."""
+    _sync_code()
+    with cd(data_root):
+        run(_in_screen(
+            'chmod +x {0} && {0}'.format(DATA_DOWNLOAD_SCRIPT_FPATH),
+            'data_download'))
+
+
+@task()
+@hosts('aws-gpu')
+def preprocess(code_root=CODE_ROOT, data_root=DATA_ROOT, *args, **kw) -> None:
     """Extracts useful stuff from the JSON data files.
 
     Examples
@@ -49,14 +77,12 @@ def preprocess(*args, **kw) -> None:
         shows all available flags, and so does `./preprocess.py --help`.
     """
     _sync_code()
-    work_dir = "/home/ubuntu/vqa/visualqa"
-    with cd(work_dir):
+    with cd(code_root):
         # Ensure we have the assets for tokenizing stuff.
         run(_as_conda('python -m spacy.en.download || echo Spacy OK'))
-
         # Extract the useful parts of the JSON inputs as text files.
-        run(_as_conda('./visualqa/preprocess.py -dataroot /data/vqa {0} '.format(
-            args_to_flags(args, kw))))
+        run(_as_conda('./visualqa/preprocess.py -dataroot {0} {1} '.format(
+            data_root, args_to_flags(args, kw))))
 
 
 @task
@@ -74,11 +100,10 @@ def train(run_label: str='aws-exp', in_screen: str='True', *args, **kw) -> None:
     print("Running AWS task with label [{0}], {1}in a screen.".format(
         run_label, "" if in_screen else "NOT "
     ))
-    work_dir = "/home/ubuntu/vqa/experiments"
-    print("Using work dir {0}.".format(work_dir))
+    exp_root = kw.get('exp_root', EXPERIMENT_ROOT)
+    print("Using work dir [{0}] as experiment root.".format(exp_root))
     _sync_code()
-
-    with cd(work_dir):
+    with cd(exp_root):
         ts = '$(date +%Y%m%dT%H%M%S)' + '-' + run_label
         tf_command = ('t=' + ts + ' && mkdir $t && cd $t && python ' +
                       _run_experiment(*args, **kw))
@@ -99,8 +124,8 @@ def setup_conda() -> None:
         '\'dl-2.7\' probably already exists.')
     run('source activate dl-2.7 && '
         'conda install -y --quiet scikit-learn scikit-image matplotlib spacy')
-    run('. activate ml && conda install spacy')
-    run('. activate ml && conda install keras')
+
+    run('. activate ml && conda install -y --quiet spacy keras')
     # TODO-LOW(andrei): Code for setting up the main environment as well.
     # Note: this env is already included in Andrei's AWS AMI (if you're using
     # that, and are not on Azure) under the name 'ml'.
@@ -109,13 +134,14 @@ def setup_conda() -> None:
 
 @task(aliases=['ls', 'lsexp', 'ls_exp'])
 @hosts('aws-gpu')
-def list_experiments() -> None:
+def list_experiments(**kw) -> None:
     """Lists all available experiment names.
 
     The experiment ID is its folder name. This is what should be passed to
     `eval` in order to perform the evaluation of that run.
     """
-    result = run('ls -lt /home/ubuntu/vqa/experiments/', stdout=io.StringIO())
+    exp_root = kw.get('exp_root', EXPERIMENT_ROOT)
+    result = run('ls -lt {0}'.format(exp_root), stdout=io.StringIO())
     print("Available experiment results (newest first):")
     for line in result.splitlines():
         if 'total' in line: continue
@@ -154,9 +180,10 @@ def eval(experiment_id: str, epoch: str='-1', *args, **kw) -> None:
         print("WARNING: will NOT recompute the answers from scratch, and will "
               "just recompute statistics. Ignoring epoch parameter.")
 
-    # root = pjoin('/data', 'vqa', 'models')
-    root = pjoin('/home', 'ubuntu', 'vqa', 'experiments')
-    experiment_folder = pjoin(root, experiment_id)
+    exp_root = kw.get('exp_root', EXPERIMENT_ROOT)
+    code_root = kw.get('code_root', CODE_ROOT)
+    data_root = kw.get('data_root', DATA_ROOT)
+    experiment_folder = pjoin(exp_root, experiment_id)
 
     model_fname = 'model.json'
     weight_fnames_raw = run('ls {0}/*.hdf5'.format(experiment_folder),
@@ -166,9 +193,12 @@ def eval(experiment_id: str, epoch: str='-1', *args, **kw) -> None:
                            for weight_fname in weight_fnames]
     epoch_weight_fnames.sort(key=lambda tup: tup[0])
 
+    # TODO(andrei): Extract this logic as separate function.
     if epoch == -1:
-        # Get the latest one
-        weight_fpath = epoch_weight_fnames[-1][1]
+        # Get the latest one, which we've helpfully annotated with the word
+        # 'final' in the file name.
+        weight_fpath = next(fn for fn_epoch, fn in epoch_weight_fnames
+                            if 'final' in fn)
     else:
         try:
             weight_fpath = next(fn for fn_epoch, fn in epoch_weight_fnames
@@ -196,13 +226,14 @@ def eval(experiment_id: str, epoch: str='-1', *args, **kw) -> None:
                                ))
 
     model_fpath = pjoin(experiment_folder, model_fname)
-    with cd('/home/ubuntu/vqa/visualqa'):
+    with cd(code_root):
         if not skip_answer_computation:
             # Generate the predictions on the validation set...
             run(_as_conda(
                 'python ./visualqa/evaluateMLP.py -model {0} -weights {1} -results {2} '
-                '-results_json {3} -dataroot /data/vqa'.format(
-                    model_fpath, weight_fpath, results_fpath, results_json_fpath)))
+                '-results_json {3} -dataroot {4}'.format(
+                    model_fpath, weight_fpath, results_fpath,
+                    results_json_fpath, data_root)))
 
         # ...and measure all sorts of cool stats.
         with cd('VQA'):
@@ -218,23 +249,22 @@ def _run_experiment(*args, **kw) -> str:
     It is called inside a screen right away when running on AWS, and submitted
     to LFS using 'bsub' on Euler.
     """
-    # return "../../visualqa/main.py"
     if '-batch_size' not in kw:
         kw['-batch_size'] = 512
     if '-dataroot' not in kw:
-        kw['-dataroot'] = '/data/vqa'
+        kw['-dataroot'] = DATA_ROOT
 
     return '../../visualqa/visualqa/trainMLP.py {0}'.format(args_to_flags(args, kw))
 
 
-def _sync_code(remote_code_dir='/home/ubuntu/vqa/visualqa') -> None:
+def _sync_code(remote_code_root=CODE_ROOT) -> None:
     """Copies the code to the remote host. Does NOT copy data.
 
     This is simply because the VQA dataset on which we are operating is over
     30 GiB, and it would be infeasible to try to sync it every time.
     """
-    run('mkdir -p {0}'.format(remote_code_dir))
-    rsync(remote_dir=remote_code_dir,
+    run('mkdir -p {0}'.format(remote_code_root))
+    rsync(remote_dir=remote_code_root,
           local_dir='.',
           exclude=['.git', '.idea', '*__pycache__*', '*.pyc'])
 
@@ -243,9 +273,8 @@ def _as_conda(cmd: str, env_name='ml') -> str:
     """Ensures the command gets run in the specified anaconda env."""
 
     # Sourcing the bashrc to ensure LD_LIBRARY_PATH is sane.
-    return "source /home/ubuntu/.bashrc && " \
-           "source /home/ubuntu/bin/anaconda3/bin/activate {0} && " \
-           "{1}".format(env_name, cmd)
+    return "source {0} && source {1} {2} && {3}".format(
+        BASHRC_FPATH, CONDA_ACTIVATE_FPATH, env_name, cmd)
 
 
 def _in_screen(cmd: str, screen_name: str, **kw) -> None:
@@ -266,8 +295,12 @@ def _in_screen(cmd: str, screen_name: str, **kw) -> None:
 def _get_epoch_number(weight_fname: str) -> int:
     """Extracts epoch number from a hdf5 weight dump file name."""
 
-    nr_str = weight_fname[weight_fname.rfind('_') + 1:
+    nr_str = weight_fname[weight_fname.find('_') + 1:
                           weight_fname.rfind('.')]
+    if 'final' in nr_str:
+        # Special file name for the final checkpoint dump: 'XX_final' instead
+        # of 'XX'.
+        nr_str = nr_str[:nr_str.find('_')]
     return int(nr_str)
 
 

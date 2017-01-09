@@ -31,6 +31,11 @@ def select_frequent_answers(questions_train, answers_train, images_train, maxAns
     return (new_questions_train, new_answers_train, new_images_train)
 
 
+def batchify(batch_size, *lists):
+    """Helper which splits the specified lists into even-sized groups."""
+    return zip(*(grouper(l, batch_size, fillvalue=l[-1]) for l in lists))
+
+
 def grouper(iterable, n, fillvalue=None):
     args = [iter(iterable)] * n
     return zip_longest(*args, fillvalue=fillvalue)

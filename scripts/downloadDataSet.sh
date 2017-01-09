@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 
-# install unzip to run this
+# Downloads the required data in the CURRENT folder.
+# Requires 'unzip' to run (`sudo apt-get install unzip`).
 
 function unzipRemove() {
    find . -name '*.zip' -exec sh -c 'unzip -d `dirname {}` {}' ';'
    rm *.zip
 }
 
-mkdir data
-cd data
-mkdir vqa
-cd vqa
+#mkdir data
+#cd data
+#mkdir vqa
+#cd vqa
 
 # download Questions
 

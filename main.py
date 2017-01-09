@@ -10,6 +10,7 @@ from visualqa.bow_vgg_baseline import BoWVGGBaseline
 
 
 def main():
+    # Dead skeleton code; do not use!
     logging.basicConfig(level=logging.INFO)
     baseline = BoWVGGBaseline()
     baseline.train()

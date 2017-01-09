@@ -1,0 +1,25 @@
+9 Jan, Andrei
+-------------
+ * Fixed image weights, 1-layer 128-unit LSTM + 3-layer 1024-unit MLP
+    - Namespace(activation='relu', batch_size=512, dataroot='/data/vqa',
+      dropout=0.5, experiment_root='.', language_only=False,
+      lstm_layer_size=128, lstm_num_layers=1, model_eval_full_valid_interval=20,
+      model_save_interval=5, num_epochs=100, num_hidden_layers=3,
+      num_hidden_units=1024, valid_ratio=0.05)
+    - unknown train/val loss :(
+    - note that this is a very lousy (super tiny) LSTM anyway, and that most
+      of the cleverness in better solutions comes from trainable image CNN.
+    - epoch 100: 34.5% accuracy on validation
+    - epoch  90: 35.8% accuracy on validation
+    - epoch  80: 36.357% accuracy on validation
+    - epoch  70: 36.912% accuracy on validation
+    - epoch  60: 36.395% accuracy on validation
+    - epoch  50: 36.472% accuracy on validation
+    - epoch  40: <pending> accuracy on validation
+    - epoch  30: <todo>
+    - epoch  20: <todo>
+
+10 Jan, Andrei
+--------------
+ * Fixed image weights, 2-layer 256-unit LSTM + 3-layer 1024-unit MLP
+   - TODO
