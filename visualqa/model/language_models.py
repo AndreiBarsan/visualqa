@@ -73,7 +73,7 @@ class SumUpLanguageModel(ALanguageModel):
 
 class LSTMLanguageModel(ALanguageModel):
     """LSTM language model with word embedding inputs."""
-    def __init__(self, lstm_num_layers, lstm_layer_size, **kw):
+    def __init__(self, lstm_num_layers, lstm_layer_size, trainable_embeddings, **kw):
         """Initializes the Keras LSTM question processing component.
 
         Args:
@@ -100,7 +100,7 @@ class LSTMLanguageModel(ALanguageModel):
         self._model = Sequential()
         shallow = lstm_num_layers == 1  # marks a one layer LSTM
 
-        self._model.add(Embedding(embeddings.shape[0], embeddings.shape[1], input_length=self._max_len, trainable=False, weights=[embeddings]))
+        self._model.add(Embedding(embeddings.shape[0], embeddings.shape[1], input_length=self._max_len, trainable=trainable_embeddings, weights=[embeddings]))
 
         lstm = LSTM(output_dim=lstm_layer_size,
                     return_sequences=not shallow,
