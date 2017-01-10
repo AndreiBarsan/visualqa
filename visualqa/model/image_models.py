@@ -55,8 +55,10 @@ class VGGImageModel(AImageModel):
         pretrained_vgg_model_fpath = pjoin(data_root, 'coco', 'vgg_feats.mat')
         features_struct = scipy.io.loadmat(pretrained_vgg_model_fpath)
         self._vgg_features = features_struct['feats']
+        print(self._vgg_features.shape)
+        raise ValueError("Derp")
         image_ids = lines(pjoin(data_root, 'coco_vgg_IDMap.txt'))
-        print ("Done.")
+        print("Done.")
 
         self._id_map = {}
         for ids in image_ids:

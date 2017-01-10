@@ -254,7 +254,8 @@ def _run_experiment(*args, **kw) -> str:
     if '-dataroot' not in kw:
         kw['-dataroot'] = DATA_ROOT
 
-    return '../../visualqa/visualqa/trainMLP.py {0}'.format(args_to_flags(args, kw))
+    return '../../visualqa/visualqa/trainMLP.py {0} 2>&1 | tee log.txt'.format(
+        args_to_flags(args, kw))
 
 
 def _sync_code(remote_code_root=CODE_ROOT) -> None:

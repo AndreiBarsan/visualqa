@@ -15,11 +15,22 @@
     - epoch  70: 36.912% accuracy on validation
     - epoch  60: 36.395% accuracy on validation
     - epoch  50: 36.472% accuracy on validation
-    - epoch  40: <pending> accuracy on validation
-    - epoch  30: <todo>
-    - epoch  20: <todo>
+    - epoch  40: 36.837% accuracy on validation
+    - epoch  30: 36.535% ???, seems WAY too much
+    - epoch  20: 36.094%
+    - epoch  10: 32.413%
+    - epoch   4: 33.558% WTFF
 
 10 Jan, Andrei
 --------------
  * Fixed image weights, 2-layer 256-unit LSTM + 3-layer 1024-unit MLP
-   - TODO
+   - 5 epochs:  36.72367063884023%
+   - 10 epochs: 36.726139530801444%
+   - 20 epochs: 37.37600675927826
+   - 30 epochs: 37.146674128207546
+   - 40 epochs: 36.99250554129156
+
+ * Fixed image weights, 2-layer 512-unit LSTM + 3-layer 1024-unit MLP
+   - <now training>
+
+ * Fixed image weights, 3-layer 512-unit LSTM + 3-layer 1024-unit MLP
