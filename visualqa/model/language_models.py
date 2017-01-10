@@ -101,6 +101,7 @@ class LSTMLanguageModel(ALanguageModel):
 
         self._model = Sequential()
         shallow = lstm_num_layers == 1  # marks a one layer LSTM
+        lstm_bi_merge_mode = 'sum'
 
         if trainable_embeddings:
             # if embeddings are trainable we have to enforce CPU usage in order to not run out of memory.
@@ -119,18 +120,21 @@ class LSTMLanguageModel(ALanguageModel):
                     return_sequences=not shallow,
                     input_shape=(self._max_len, embedding_dims))
         if self._bidirectional:
-            lstm = Bidirectional(lstm)
+            print("Using bidirectional LSTM.")
+            lstm = Bidirectional(lstm, merge_mode=lstm_bi_merge_mode,
+                                 # Mini-hack due to possible Keras weirdness.
+                                 input_shape=(self._max_len, embedding_dims))
         self._model.add(lstm)
         if not shallow:
             for i in range(lstm_num_layers-2):
                 lstm = LSTM(output_dim=lstm_layer_size, return_sequences=True)
                 if self._bidirectional:
-                    lstm = Bidirectional(lstm)
+                    lstm = Bidirectional(lstm, merge_mode=lstm_bi_merge_mode)
                 self._model.add(lstm)
 
             lstm = LSTM(output_dim=lstm_layer_size, return_sequences=False)
             if self._bidirectional:
-                lstm = Bidirectional(lstm)
+                lstm = Bidirectional(lstm, merge_mode=lstm_bi_merge_mode)
             self._model.add(lstm)
 
     def model(self):

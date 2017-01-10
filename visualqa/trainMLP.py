@@ -75,6 +75,9 @@ def parse_arguments():
                         help="Whether to l2-normalize individual image "
                              "feature vectors (may lead to better "
                              "performance).")
+    parser.add_argument('-lstm_bidirectional', type=bool, default=False,
+                        help="Whether to use a bidirectional LSTM (default is "
+                             "no.)")
     # get args
     args = parser.parse_args()
     # Dump the arguments so we know which parameters we used for training.
@@ -89,7 +92,8 @@ def construct_model(args, data_root, experiment_root, nb_classes):
     # specify language model:
     lang_model = language_models.LSTMLanguageModel(args.lstm_num_layers,
                                                    args.lstm_layer_size,
-                                                   args.trainable_embeddings)
+                                                   args.trainable_embeddings,
+                                                   bidirectional=args.lstm_bidirectional)
 
     # specify image mode:
     img_model = image_models.VGGImageModel(data_root, args.l2_norm_images)

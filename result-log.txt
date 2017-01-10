@@ -36,11 +36,33 @@
    - 100 epochs: 37.100862466259193%
 
  * Fixed image weights, 2-layer 512-unit LSTM + 3-layer 1024-unit MLP
-   - 5 epochs:  <pending>
-   - <now training>
+   - 5 epochs:  36.000833936840904%
+   - 10 epochs: 36.332762744969554%
+   - 15 epochs: 36.83038163583364%
+   - 20 epochs: 36.794994184388535%
+   - 25 epochs: 36.534663243137094%
+   - 35 epochs: 35.360019312221963%
+   - 50 epochs: 36.54453881098226%
+   - 60 epochs: 36.67100094366604%
 
- * Fixed image weights, 2-layer 512-unit LSTM + 3-layer 1024-unit MLP, image
+ * Fixed image weights, 2-layer 256-unit LSTM + 3-layer 1024-unit MLP, image
    l2-normalization
-   -
+     5, 27.76351306866713%
+     10, 27.76351306866713% ???? identical?
+     20, 20.466565716416943%
+     30, 20.466565716416943%
+     40, 20.466565716416943%
 
- * Fixed image weights, 3-layer 512-unit LSTM + 3-layer 1024-unit MLP
+ * Fixed image weights, 3-layer 256-unit LSTM + 3-layer 1024-unit MLP
+   10, 35.946243992363536%
+   20, 35.899609366428037%
+   30, 36.3311168169954%
+   40, 36.28585379770509%
+   50, 35.899609366428015%
+   60, 30.48697522329728
+
+ * Fixed image weights, 1-layer 128-unit Bidirectional LSTM + 3-layer 1024-unit MLP
+   5, 0.37108817784801107
+   10, 0.3705121030570442
+   20, 0.367096802510595
+   30, 0.3642136853424685
