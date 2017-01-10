@@ -1,5 +1,6 @@
 # WARNING: this may cause weird errors when imported after Keras!
 from keras.layers import Bidirectional
+from keras.layers.embeddings import Embedding
 
 try:
     from spacy.en import English
@@ -14,7 +15,7 @@ from keras.models import Sequential
 from keras.layers.core import Reshape
 from keras.layers.recurrent import LSTM
 
-from features import get_questions_matrix_sum, get_questions_tensor_timeseries
+from features import get_questions_matrix_sum, get_questions_tensor_timeseries, get_embeddings
 
 
 class ALanguageModel(ABC):
@@ -87,7 +88,9 @@ class LSTMLanguageModel(ALanguageModel):
         print('Loading GloVe data... ', end='', flush=True)
         self._nlp = English()
         print('Done.')
-        embedding_dims = 300
+        #embedding_dims = 300
+        embeddings = get_embeddings(self._nlp.vocab)
+        embedding_dims = embeddings.shape[1] 
 
         # TODO(Bernhard): Investigate how the LSTM parameters influence the
         # overall performance.
@@ -96,6 +99,8 @@ class LSTMLanguageModel(ALanguageModel):
 
         self._model = Sequential()
         shallow = lstm_num_layers == 1  # marks a one layer LSTM
+
+        self._model.add(Embedding(embeddings.shape[0], embeddings.shape[1], input_length=self._max_len, trainable=False, weights=[embeddings]))
 
         lstm = LSTM(output_dim=lstm_layer_size,
                     return_sequences=not shallow,
