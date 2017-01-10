@@ -71,6 +71,10 @@ def parse_arguments():
     parser.add_argument('-valid_ratio', type=float, default=0.05,
                         help="How much of the training data to use for "
                              "validation during training.")
+    parser.add_argument('-l2_norm_images', type=bool, default=False,
+                        help="Whether to l2-normalize individual image "
+                             "feature vectors (may lead to better "
+                             "performance).")
     # get args
     args = parser.parse_args()
     # Dump the arguments so we know which parameters we used for training.
@@ -88,7 +92,7 @@ def construct_model(args, data_root, experiment_root, nb_classes):
                                                    args.trainable_embeddings)
 
     # specify image mode:
-    img_model = image_models.VGGImageModel(data_root)
+    img_model = image_models.VGGImageModel(data_root, args.l2_norm_images)
 
     # specify vqa mode:
     final_model = vqa_model.VqaModel(lang_model, img_model,

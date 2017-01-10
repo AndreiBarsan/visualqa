@@ -10,6 +10,7 @@ from os.path import join as pjoin
 from utils import lines
 
 import scipy.io
+import numpy as np
 
 
 class AImageModel(ABC):
@@ -44,7 +45,14 @@ class VGGImageModel(AImageModel):
     as image features. The convolutions are not caluclated but pre-computed
     image features are looked up and directly plugged into the network.
     """
-    def __init__(self, data_root):
+    def __init__(self, data_root: str, l2_norm_features: bool=False) -> None:
+        """Initializes the fixed image embedding layer.
+
+        Args:
+            data_root: Root data folder.
+            l2_norm_features: Whether to l2_normalize the individual image
+                              feature vectors (may lead to better performance).
+        """
         # Dimensionality of image features
         img_dim = 4096
         self._model = Sequential()
@@ -54,12 +62,20 @@ class VGGImageModel(AImageModel):
         print("Loading VGG features...")
         pretrained_vgg_model_fpath = pjoin(data_root, 'coco', 'vgg_feats.mat')
         features_struct = scipy.io.loadmat(pretrained_vgg_model_fpath)
-        self._vgg_features = features_struct['feats']
-        print(self._vgg_features.shape)
-        raise ValueError("Derp")
         image_ids = lines(pjoin(data_root, 'coco_vgg_IDMap.txt'))
         print("Done.")
 
+        # Do a little massaging.
+        img_matrix = features_struct['feats']
+        assert img_matrix.shape[0] == img_dim
+
+        if l2_norm_features:
+            print("Performing image feature l2-normalization.")
+            norms = np.linalg.norm(img_matrix, axis=0)
+            img_matrix /= norms
+            print("Done.")
+
+        self._vgg_features = img_matrix
         self._id_map = {}
         for ids in image_ids:
             id_split = ids.split()

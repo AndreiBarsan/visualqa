@@ -29,8 +29,18 @@
    - 20 epochs: 37.37600675927826
    - 30 epochs: 37.146674128207546
    - 40 epochs: 36.99250554129156
+   - 50 epochs: 37.39356332433632%
+   - 60 epochs: 37.18453047161399%
+   - 70 epochs: 37.198246538065555%
+   - 80 epochs: 37.1738319397817%
+   - 100 epochs: 37.100862466259193%
 
  * Fixed image weights, 2-layer 512-unit LSTM + 3-layer 1024-unit MLP
+   - 5 epochs:  <pending>
    - <now training>
+
+ * Fixed image weights, 2-layer 512-unit LSTM + 3-layer 1024-unit MLP, image
+   l2-normalization
+   -
 
  * Fixed image weights, 3-layer 512-unit LSTM + 3-layer 1024-unit MLP
