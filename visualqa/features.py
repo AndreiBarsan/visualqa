@@ -32,8 +32,9 @@ def get_questions_tensor_timeseries(questions, nlp, max_length):
                 if j == max_length:
                     concatenated += 1
                     break
-    if concatenated > 0:
-        print("warning {0} questions concatenated".format(concatenated))
+    # output silenced for now:
+    #if concatenated > 0:
+        #print("warning {0} questions concatenated".format(concatenated))
     return questions_tensor
 
 
