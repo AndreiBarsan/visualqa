@@ -21,7 +21,7 @@ def get_questions_tensor_timeseries(questions, nlp, max_length):
     '''
     # assert not isinstance(questions, basestring)
     questions_tensor = np.zeros((len(questions), max_length), dtype='int32')
-    concatenated = 0
+    trimmed = 0
     for i, doc in enumerate(questions):
         j = 0
         for token in nlp(doc):
@@ -30,11 +30,11 @@ def get_questions_tensor_timeseries(questions, nlp, max_length):
                 j += 1
             else:
                 if j == max_length:
-                    concatenated += 1
+                    trimmed += 1
                     break
     # output silenced for now:
-    #if concatenated > 0:
-        #print("warning {0} questions concatenated".format(concatenated))
+    #if trimmed > 0:
+        #print("warning {0} questions trimmed".format(trimmed))
     return questions_tensor
 
 
