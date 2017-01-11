@@ -7,7 +7,7 @@ import numpy as np
 from keras.utils import np_utils
 
 
-def get_questions_tensor_timeseries(questions, nlp, max_lenght):
+def get_questions_tensor_timeseries(questions, nlp, max_length):
     '''
     Returns a time series of word vectors for tokens in the question
 
@@ -20,15 +20,21 @@ def get_questions_tensor_timeseries(questions, nlp, max_lenght):
     A numpy ndarray of shape: (nb_samples, timesteps, word_vec_dim)
     '''
     # assert not isinstance(questions, basestring)
-    nb_samples = len(questions)
-    word_vec_dim = nlp(questions[0])[0].vector.shape[0]
-    questions_tensor = np.zeros((nb_samples, max_lenght, word_vec_dim))
-    for i in range(len(questions)):
-        tokens = nlp(questions[i])
-        for j in range(len(tokens)):
-            if j < max_lenght:
-                questions_tensor[i,j,:] = tokens[j].vector
-
+    questions_tensor = np.zeros((len(questions), max_length), dtype='int32')
+    trimmed = 0
+    for i, doc in enumerate(questions):
+        j = 0
+        for token in nlp(doc):
+            if j < max_length and token.has_vector:
+                questions_tensor[i, j] = token.rank
+                j += 1
+            else:
+                if j == max_length:
+                    trimmed += 1
+                    break
+    # output silenced for now:
+    #if trimmed > 0:
+        #print("warning {0} questions trimmed".format(trimmed))
     return questions_tensor
 
 
@@ -94,3 +100,20 @@ def get_images_matrix(img_coco_ids, img_map, VGGfeatures):
         image_matrix[j, :] = VGGfeatures[:, img_map[img_coco_ids[j]]]
 
     return image_matrix
+
+
+def get_embeddings(vocab):
+    '''
+    Extracts word embeddings from a nlp object (Spacy)
+
+    Input:
+    vocab: nlp.vocab
+    Ouput:
+    A numpy array containing the word embeddings
+    '''
+    max_rank = max(lex.rank for lex in vocab if lex.has_vector)
+    vectors = np.zeros((max_rank+1, vocab.vectors_length), dtype='float32')
+    for lex in vocab:
+        if lex.has_vector:
+            vectors[lex.rank] = lex.vector
+    return vectors

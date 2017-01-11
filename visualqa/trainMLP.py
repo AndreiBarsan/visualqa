@@ -51,6 +51,7 @@ def parse_arguments():
                         help="Number of hidden layers in the final MLP.")
     parser.add_argument('-lstm_num_layers', type=int, default=1)
     parser.add_argument('-lstm_layer_size', type=int, default=256)
+    parser.add_argument('-trainable_embeddings', type=bool, default=False)
     parser.add_argument('-dropout', type=float, default=0.5)
     parser.add_argument('-activation', type=str, default='relu')
     parser.add_argument('-language_only', type=bool, default=False)
@@ -83,7 +84,8 @@ def construct_model(args, data_root, experiment_root, nb_classes):
 
     # specify language model:
     lang_model = language_models.LSTMLanguageModel(args.lstm_num_layers,
-                                                   args.lstm_layer_size)
+                                                   args.lstm_layer_size,
+                                                   args.trainable_embeddings)
 
     # specify image mode:
     img_model = image_models.VGGImageModel(data_root)

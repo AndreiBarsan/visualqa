@@ -1,5 +1,6 @@
 # WARNING: this may cause weird errors when imported after Keras!
 from keras.layers import Bidirectional
+from keras.layers.embeddings import Embedding
 
 try:
     from spacy.en import English
@@ -9,12 +10,14 @@ except ImportError as err:
           "that it is the first thing you import in a Python program.")
     raise
 
+import tensorflow as tf
+
 from abc import ABC, abstractmethod
 from keras.models import Sequential
 from keras.layers.core import Reshape
 from keras.layers.recurrent import LSTM
 
-from features import get_questions_matrix_sum, get_questions_tensor_timeseries
+from features import get_questions_matrix_sum, get_questions_tensor_timeseries, get_embeddings
 
 
 class ALanguageModel(ABC):
@@ -72,7 +75,7 @@ class SumUpLanguageModel(ALanguageModel):
 
 class LSTMLanguageModel(ALanguageModel):
     """LSTM language model with word embedding inputs."""
-    def __init__(self, lstm_num_layers, lstm_layer_size, **kw):
+    def __init__(self, lstm_num_layers, lstm_layer_size, trainable_embeddings, **kw):
         """Initializes the Keras LSTM question processing component.
 
         Args:
@@ -87,15 +90,30 @@ class LSTMLanguageModel(ALanguageModel):
         print('Loading GloVe data... ', end='', flush=True)
         self._nlp = English()
         print('Done.')
-        embedding_dims = 300
+        #embedding_dims = 300
+        embeddings = get_embeddings(self._nlp.vocab)
+        embedding_dims = embeddings.shape[1] 
 
         # TODO(Bernhard): Investigate how the LSTM parameters influence the
         # overall performance.
-        self._max_len = kw.get('max_sentence_length', 20)
+        self._max_len = kw.get('max_sentence_length', 15)
         self._bidirectional = kw.get('bidirectional', False)
 
         self._model = Sequential()
         shallow = lstm_num_layers == 1  # marks a one layer LSTM
+
+        if trainable_embeddings:
+            # if embeddings are trainable we have to enforce CPU usage in order to not run out of memory.
+            # this is device dependent.
+            # TODO(Bernhard): preprocess questions ans vocab and try if we can get rid of enough words to make
+            # this run on gpu anyway
+            with tf.device("/cpu:0"):
+                self._model.add(Embedding(embeddings.shape[0], embeddings.shape[1],
+                                      input_length=self._max_len, trainable=True, weights=[embeddings]))
+        else:
+            # a non-trainable embedding layer can run on GPU without exhausting all the memory
+            self._model.add(Embedding(embeddings.shape[0], embeddings.shape[1],
+                                      input_length=self._max_len, trainable=False, weights=[embeddings]))
 
         lstm = LSTM(output_dim=lstm_layer_size,
                     return_sequences=not shallow,
