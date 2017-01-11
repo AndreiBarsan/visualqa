@@ -10,6 +10,8 @@ except ImportError as err:
           "that it is the first thing you import in a Python program.")
     raise
 
+import tensorflow as tf
+
 from abc import ABC, abstractmethod
 from keras.models import Sequential
 from keras.layers.core import Reshape
@@ -94,13 +96,24 @@ class LSTMLanguageModel(ALanguageModel):
 
         # TODO(Bernhard): Investigate how the LSTM parameters influence the
         # overall performance.
-        self._max_len = kw.get('max_sentence_length', 20)
+        self._max_len = kw.get('max_sentence_length', 15)
         self._bidirectional = kw.get('bidirectional', False)
 
         self._model = Sequential()
         shallow = lstm_num_layers == 1  # marks a one layer LSTM
 
-        self._model.add(Embedding(embeddings.shape[0], embeddings.shape[1], input_length=self._max_len, trainable=trainable_embeddings, weights=[embeddings]))
+        if trainable_embeddings:
+            # if embeddings are trainable we have to enforce CPU usage in order to not run out of memory.
+            # this is device dependent.
+            # TODO(Bernhard): preprocess questions ans vocab and try if we can get rid of enough words to make
+            # this run on gpu anyway
+            with tf.device("/cpu:0"):
+                self._model.add(Embedding(embeddings.shape[0], embeddings.shape[1],
+                                      input_length=self._max_len, trainable=True, weights=[embeddings]))
+        else:
+            # a non-trainable embedding layer can run on GPU without exhausting all the memory
+            self._model.add(Embedding(embeddings.shape[0], embeddings.shape[1],
+                                      input_length=self._max_len, trainable=False, weights=[embeddings]))
 
         lstm = LSTM(output_dim=lstm_layer_size,
                     return_sequences=not shallow,

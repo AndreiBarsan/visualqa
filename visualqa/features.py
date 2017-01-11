@@ -21,9 +21,19 @@ def get_questions_tensor_timeseries(questions, nlp, max_length):
     '''
     # assert not isinstance(questions, basestring)
     questions_tensor = np.zeros((len(questions), max_length), dtype='int32')
+    concatenated = 0
     for i, doc in enumerate(questions):
-        for j, token in enumerate(nlp(doc[:max_length])):
-            questions_tensor[i, j] = token.rank if token.has_vector else 0 
+        j = 0
+        for token in nlp(doc):
+            if j < max_length and token.has_vector:
+                questions_tensor[i, j] = token.rank
+                j += 1
+            else:
+                if j == max_length:
+                    concatenated += 1
+                    break
+    if concatenated > 0:
+        print("warning {0} questions concatenated".format(concatenated))
     return questions_tensor
 
 
@@ -101,7 +111,7 @@ def get_embeddings(vocab):
     A numpy array containing the word embeddings
     '''
     max_rank = max(lex.rank for lex in vocab if lex.has_vector)
-    vectors = np.ndarray((max_rank+1, vocab.vectors_length), dtype='float32')
+    vectors = np.zeros((max_rank+1, vocab.vectors_length), dtype='float32')
     for lex in vocab:
         if lex.has_vector:
             vectors[lex.rank] = lex.vector
