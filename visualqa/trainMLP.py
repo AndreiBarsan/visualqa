@@ -49,8 +49,8 @@ def parse_arguments():
                         help="Hidden layer size in the final MLP.")
     parser.add_argument('-num_hidden_layers', type=int, default=3,
                         help="Number of hidden layers in the final MLP.")
-    parser.add_argument('-lstm_num_layers', type=int, default=1)
-    parser.add_argument('-lstm_layer_size', type=int, default=256)
+    parser.add_argument('-lstm_num_layers', type=int, default=2)
+    parser.add_argument('-lstm_layer_size', type=int, default=100)
     parser.add_argument('-trainable_embeddings', type=bool, default=False)
     parser.add_argument('-dropout', type=float, default=0.5)
     parser.add_argument('-activation', type=str, default='relu')

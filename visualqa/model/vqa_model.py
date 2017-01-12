@@ -47,7 +47,7 @@ class VqaModel(object):
         model.add(Activation('softmax'))
 
         print('Compiling Keras model...')
-        model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
+        model.compile(loss='categorical_crossentropy', optimizer='adam')
         print('Compilation done...')
         self._model = model
 
