@@ -89,6 +89,8 @@ class LSTMLanguageModel(ALanguageModel):
         """
         print('Loading GloVe data... ', end='', flush=True)
         self._nlp = English()
+        with open('/data/vqa/embeddings/glove.42B.300d.txt') as embeddings_file:
+            self._nlp.vocab.load_vectors(embeddings_file)
         print('Done.')
         #embedding_dims = 300
         embeddings = get_embeddings(self._nlp.vocab)

@@ -67,6 +67,8 @@ def main():
         img_map[id_split[0]] = int(id_split[1])
 
     nlp = English()
+    with open('/data/vqa/embeddings/glove.42B.300d.txt') as embeddings_file:
+        nlp.vocab.load_vectors(embeddings_file)
     print('loaded word2vec features')
 
     nb_classes = 1000

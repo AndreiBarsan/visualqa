@@ -65,3 +65,9 @@ mkdir Preprocessed
 wget http://cs.stanford.edu/people/karpathy/deepimagesent/coco.zip
 unzipRemove
 wget https://raw.githubusercontent.com/avisingh599/visual-qa/master/features/coco_vgg_IDMap.txt
+
+# download GloVe embeddings
+
+mkdir embeddings
+wget http://nlp.stanford.edu/data/glove.42B.300d.zip
+unzipRemove
